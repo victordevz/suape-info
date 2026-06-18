@@ -22,11 +22,15 @@ export default async function Home() {
   const activeSource = data.sources[0];
   const metrics = getMetrics(data.documents);
 
-  async function syncNow() {
+  async function syncNow(formData: FormData) {
     'use server';
 
+    const connectedSourceId = String(formData.get('connectedSourceId') ?? '');
+
     try {
-      await runGoogleDriveSync();
+      await runGoogleDriveSync({
+        connectedSourceId: connectedSourceId || undefined,
+      });
     } finally {
       revalidatePath('/');
     }
@@ -75,7 +79,7 @@ export default async function Home() {
               Nenhuma pasta monitorada. Conecte o Drive e selecione uma pasta.
             </div>
           )}
-        </section>s
+        </section>
       </aside>
 
       <section className="content-area">
@@ -90,6 +94,11 @@ export default async function Home() {
               <input placeholder="Nome, licenca, processo ou pasta" />
             </label>
             <form action={syncNow}>
+              <input
+                name="connectedSourceId"
+                type="hidden"
+                value={activeSource?.id ?? ''}
+              />
               <button
                 aria-label="Sincronizar agora"
                 className="sync-button"

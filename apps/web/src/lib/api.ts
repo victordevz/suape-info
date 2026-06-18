@@ -66,6 +66,13 @@ export type DashboardData = {
   jobs: ImportJob[];
 };
 
+export type SyncResult = {
+  foldersScanned: number;
+  documentsDetected: number;
+  jobsCreated: number;
+  errors: Array<{ folderId: string; message: string }>;
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api';
 
 async function fetchJson<T>(path: string): Promise<T> {
@@ -116,13 +123,26 @@ export async function getDashboardData(): Promise<DashboardData> {
   }
 }
 
-export async function runGoogleDriveSync() {
-  await fetch(`${API_URL}/sync/google-drive/run`, {
+export async function runGoogleDriveSync(input?: {
+  connectedSourceId?: string;
+  monitoredFolderId?: string;
+}) {
+  const response = await fetch(`${API_URL}/sync/google-drive/run`, {
     method: 'POST',
     cache: 'no-store',
     headers: {
       'content-type': 'application/json',
     },
-    body: JSON.stringify({}),
+    body: JSON.stringify(input ?? {}),
   });
+
+  if (!response.ok) {
+    const message = await response.text();
+
+    throw new Error(
+      `Falha ao sincronizar Google Drive (${response.status}): ${message}`,
+    );
+  }
+
+  return response.json() as Promise<SyncResult>;
 }
