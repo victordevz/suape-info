@@ -1,0 +1,33 @@
+{
+  "name": "poketeam",
+  "version": "0.1.0",
+  "description": "Monorepo da plataforma Poketeam para governanca ambiental, evidencias e dados regulatorios.",
+  "private": true,
+  "license": "UNLICENSED",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev:api",
+    "dev:api": "npm run dev --workspace @poketeam/api",
+    "dev:web": "npm run dev --workspace @poketeam/web",
+    "build": "npm run build --workspaces --if-present",
+    "build:api": "npm run build --workspace @poketeam/api",
+    "build:web": "npm run build --workspace @poketeam/web",
+    "start:api": "npm run start --workspace @poketeam/api",
+    "start:web": "npm run start --workspace @poketeam/web",
+    "test": "npm run test --workspaces --if-present",
+    "test:api": "npm run test --workspace @poketeam/api",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "prisma:generate": "npm run prisma:generate --workspace @poketeam/api",
+    "db:migrate": "npm run db:migrate --workspace @poketeam/api",
+    "db:deploy": "npm run db:deploy --workspace @poketeam/api",
+    "db:seed": "npm run db:seed --workspace @poketeam/api",
+    "db:studio": "npm run db:studio --workspace @poketeam/api",
+    "db:reset": "npm run db:reset --workspace @poketeam/api"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

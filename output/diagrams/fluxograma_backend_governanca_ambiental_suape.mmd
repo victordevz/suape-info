@@ -1,0 +1,149 @@
+flowchart LR
+  subgraph FONTES["Fontes de dados mantidas pelo time"]
+    DRIVE["Google Drive<br/>Docs, PDFs, fotos, mapas, ARTs, oficios"]
+    SHEETS["Google Sheets<br/>prazos, responsaveis, status, controles"]
+    GOV["Sistemas externos<br/>Governo PE, orgaos ambientais, bombeiros, prefeituras"]
+    UPLOAD["Upload eventual<br/>arquivos historicos e complementares"]
+    CRUD["CRUD manual<br/>ajustes, cadastros e excecoes"]
+  end
+
+  subgraph INGESTAO["Camada de ingestao e sincronizacao"]
+    GOOGLE_API["Conectores Google API<br/>OAuth, Drive API, Sheets API"]
+    WATCHER["Monitor de mudancas<br/>webhook, polling e jobs agendados"]
+    IMPORT_QUEUE["Fila de importacao<br/>idempotencia, checksum, retry"]
+    SOURCE_REGISTRY["Registro da origem<br/>fonte, arquivo, planilha, aba, linha, versao"]
+  end
+
+  subgraph PROCESSAMENTO["Processamento e organizacao da informacao"]
+    EXTRACT["Extracao de conteudo<br/>texto, OCR, metadados, tabelas"]
+    NORMALIZE["Normalizacao<br/>preserva original e gera versao consultavel"]
+    AI_CLASSIFIER["IA assistiva de classificacao<br/>sugere obra, licenca, condicionante, obrigacao, prazo"]
+    VALIDATION["Validacao humana<br/>area responsavel ou aprovador tecnico confirma vinculos"]
+  end
+
+  subgraph STORAGE["Armazenamento governado"]
+    OBJECT_STORE["Object Storage versionado<br/>originais, anexos, comprovantes, evidencias"]
+    REL_DB["Banco relacional transacional<br/>modelo regulatorio e trilha operacional"]
+    SEARCH_INDEX["Indice de busca<br/>consulta textual e filtros estruturados"]
+    VECTOR_INDEX["Indice vetorial<br/>RAG com trechos e referencias aos documentos"]
+    AUDIT_LEDGER["Trilha de auditoria imutavel<br/>criacao, edicao, exclusao logica, download, envio, aprovacao"]
+  end
+
+  subgraph MODELO["Modelo central de dados"]
+    OBRA["Obra ou atividade"]
+    LICENCA["Licenca ou autorizacao<br/>vigencia, renovacao, orgao, escopo"]
+    COND["Condicionante<br/>periodicidade, prazo, status"]
+    OBRIG["Obrigacao regulatoria<br/>entrega concreta e rastreavel"]
+    EVID["Evidencia<br/>arquivo, tipo, origem, validade, confidencialidade"]
+    PROTO["Protocolo ou envio<br/>numero, orgao, sistema, comprovante"]
+    RESP["Responsavel<br/>pessoa, area, contratada, aprovador"]
+    EVENTO["Evento auditavel<br/>usuario, acao, dado anterior, dado novo, justificativa"]
+  end
+
+  subgraph SERVICOS["Servicos de backend"]
+    API["API da aplicacao<br/>RBAC/ABAC, LGPD, permissoes por perfil e area"]
+    CRUD_SERVICE["Servicos CRUD<br/>cadastro regulatorio, matriz de responsabilidade, status"]
+    SCHEDULER["Agenda preditiva<br/>vencimentos, recorrencias, renovacoes, SLA"]
+    RISK["Motor de risco<br/>prazos proximos, evidencias faltantes, protocolos sem comprovante"]
+    DOSSIER["Gerador de dossie<br/>obra, licenca, condicionante, processo, orgao"]
+    EXPORT["Exportacao controlada<br/>auditoria, fiscalizacao, defesas e relatorios gerenciais"]
+  end
+
+  subgraph IA["Microservico de IA seguro"]
+    RAG["RAG corporativo<br/>busca hibrida em banco, indice textual e indice vetorial"]
+    AI_TOOLS["Ferramentas controladas<br/>SQL somente leitura, recuperacao de evidencias, resumo de processos"]
+    AI_GUARD["Governanca da IA<br/>permissoes, citacoes, logs, mascaramento, sem escrita automatica"]
+    AI_ASSIST["Assistente de navegacao<br/>perguntas, prazos, status, riscos, documentos relacionados"]
+  end
+
+  subgraph APP["Aplicacao de consulta e operacao"]
+    UI_SEARCH["Busca e navegacao<br/>por obra, licenca, orgao, condicionante, prazo, status"]
+    UI_PROCESS["Tela do processo<br/>linha do tempo, evidencias, protocolos, decisoes"]
+    UI_ALERTS["Painel de riscos<br/>pendencias, vencimentos, atrasos, responsaveis"]
+    UI_AUDIT["Auditoria e historico<br/>quem fez, quando, por que e qual versao"]
+  end
+
+  DRIVE --> GOOGLE_API
+  SHEETS --> GOOGLE_API
+  GOOGLE_API --> WATCHER
+  WATCHER --> IMPORT_QUEUE
+  GOV --> IMPORT_QUEUE
+  UPLOAD --> IMPORT_QUEUE
+  CRUD --> API
+  IMPORT_QUEUE --> SOURCE_REGISTRY
+  SOURCE_REGISTRY --> EXTRACT
+  EXTRACT --> NORMALIZE
+  NORMALIZE --> AI_CLASSIFIER
+  AI_CLASSIFIER --> VALIDATION
+  VALIDATION --> OBJECT_STORE
+  VALIDATION --> REL_DB
+  VALIDATION --> SEARCH_INDEX
+  VALIDATION --> VECTOR_INDEX
+  VALIDATION --> AUDIT_LEDGER
+
+  REL_DB --> OBRA
+  REL_DB --> LICENCA
+  REL_DB --> COND
+  REL_DB --> OBRIG
+  REL_DB --> EVID
+  REL_DB --> PROTO
+  REL_DB --> RESP
+  REL_DB --> EVENTO
+
+  OBRA --> LICENCA
+  LICENCA --> COND
+  COND --> OBRIG
+  OBRIG --> EVID
+  OBRIG --> PROTO
+  OBRIG --> RESP
+  EVID --> EVENTO
+  PROTO --> EVENTO
+  RESP --> EVENTO
+
+  API --> CRUD_SERVICE
+  API --> SCHEDULER
+  API --> RISK
+  API --> DOSSIER
+  API --> EXPORT
+  API --> AUDIT_LEDGER
+
+  REL_DB --> API
+  OBJECT_STORE --> API
+  SEARCH_INDEX --> API
+  VECTOR_INDEX --> RAG
+  SEARCH_INDEX --> RAG
+  REL_DB --> AI_TOOLS
+  OBJECT_STORE --> AI_TOOLS
+  RAG --> AI_TOOLS
+  AI_TOOLS --> AI_GUARD
+  AI_GUARD --> AI_ASSIST
+  AI_GUARD --> AUDIT_LEDGER
+
+  API --> UI_SEARCH
+  API --> UI_PROCESS
+  API --> UI_ALERTS
+  API --> UI_AUDIT
+  AI_ASSIST --> UI_SEARCH
+  AI_ASSIST --> UI_PROCESS
+  SCHEDULER --> UI_ALERTS
+  RISK --> UI_ALERTS
+  DOSSIER --> UI_PROCESS
+  EXPORT --> UI_AUDIT
+
+  classDef fonte fill:#f7f7f7,stroke:#6b7280,color:#111827
+  classDef ingest fill:#e8f0fe,stroke:#2563eb,color:#111827
+  classDef process fill:#ecfdf3,stroke:#16a34a,color:#111827
+  classDef storage fill:#fff7ed,stroke:#ea580c,color:#111827
+  classDef model fill:#fefce8,stroke:#ca8a04,color:#111827
+  classDef service fill:#eef2ff,stroke:#4f46e5,color:#111827
+  classDef ai fill:#fdf2f8,stroke:#db2777,color:#111827
+  classDef app fill:#f0fdfa,stroke:#0f766e,color:#111827
+
+  class DRIVE,SHEETS,GOV,UPLOAD,CRUD fonte
+  class GOOGLE_API,WATCHER,IMPORT_QUEUE,SOURCE_REGISTRY ingest
+  class EXTRACT,NORMALIZE,AI_CLASSIFIER,VALIDATION process
+  class OBJECT_STORE,REL_DB,SEARCH_INDEX,VECTOR_INDEX,AUDIT_LEDGER storage
+  class OBRA,LICENCA,COND,OBRIG,EVID,PROTO,RESP,EVENTO model
+  class API,CRUD_SERVICE,SCHEDULER,RISK,DOSSIER,EXPORT service
+  class RAG,AI_TOOLS,AI_GUARD,AI_ASSIST ai
+  class UI_SEARCH,UI_PROCESS,UI_ALERTS,UI_AUDIT app

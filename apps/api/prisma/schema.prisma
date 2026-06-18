@@ -1,0 +1,1087 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RecordStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+  OVERDUE
+  REVOKED
+  ARCHIVED
+}
+
+enum ConfidentialityLevel {
+  PUBLIC
+  INTERNAL
+  RESTRICTED
+  CONFIDENTIAL
+}
+
+enum SourceKind {
+  GOOGLE_DRIVE
+  GOOGLE_SHEETS
+  MANUAL_UPLOAD
+  MANUAL_ENTRY
+  EXTERNAL_SYSTEM
+}
+
+enum DocumentKind {
+  LICENSE
+  AUTHORIZATION
+  REGULATORY_DOCUMENT
+  CONDITION_EVIDENCE
+  PROTOCOL_PROOF
+  OFFICIAL_LETTER
+  TECHNICAL_REPORT
+  IMAGE
+  MAP
+  OTHER
+}
+
+enum ImportStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+  SKIPPED
+}
+
+enum ConnectionStatus {
+  CONNECTED
+  ERROR
+  EXPIRED
+  PENDING_PERMISSION
+  DISCONNECTED
+}
+
+enum SyncStatus {
+  IDLE
+  SYNCING
+  FAILED
+}
+
+enum SourceDocumentImportStatus {
+  DETECTED
+  QUEUED
+  IMPORTED
+  EXTRACTED
+  CLASSIFICATION_PENDING
+  VALIDATION_PENDING
+  LINKED
+  FAILED
+}
+
+enum ExtractionStatus {
+  PENDING
+  SUCCESS
+  PARTIAL
+  FAILED
+  SKIPPED
+}
+
+enum ImportJobType {
+  SCAN
+  IMPORT
+  EXTRACT_TEXT
+  EXTRACT_METADATA
+  REINDEX
+}
+
+enum ImportJobStatus {
+  QUEUED
+  RUNNING
+  SUCCESS
+  FAILED
+  RETRYING
+}
+
+enum IngestedDocumentType {
+  LICENCA
+  AUTORIZACAO
+  PLANILHA_CONTROLE
+  OFICIO
+  RELATORIO
+  PROTOCOLO
+  AUTO_INFRACAO
+  OUTRO
+}
+
+enum DocumentMetadataStatus {
+  SUGGESTED
+  CONFIRMED
+  REJECTED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  SOFT_DELETE
+  APPROVE
+  REJECT
+  DOWNLOAD
+  EXPORT
+  IMPORT_STATUS_CHANGE
+  AI_QUERY
+}
+
+enum ResponsiblePartyType {
+  INTERNAL_USER
+  AREA
+  CONTRACTOR
+  EXTERNAL_AGENCY
+}
+
+enum DeadlineStatus {
+  SCHEDULED
+  DUE_SOON
+  OVERDUE
+  COMPLETED
+  CANCELLED
+}
+
+enum RiskKind {
+  DEADLINE_NEAR
+  MISSING_EVIDENCE
+  PROTOCOL_WITHOUT_PROOF
+  UNASSIGNED_RESPONSIBLE
+  RECURRENT_DELAY
+}
+
+enum RiskSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum LicenseKind {
+  LP
+  LI
+  LO
+  RLO
+  AUT
+  PLI
+  CP
+  LS
+  OUTRO
+}
+
+enum RegulatoryClauseType {
+  EXIGENCIA
+  CONDICIONANTE
+  REQUISITO
+  OBSERVACAO
+  RESTRICAO
+  PROIBICAO
+  OBJETIVO
+}
+
+enum ObligationType {
+  ENTREGA_DOCUMENTAL
+  RENOVACAO
+  COMUNICACAO
+  RELATORIO
+  RESTRICAO
+  EVENTO
+  MANUTENCAO_CADASTRAL
+}
+
+enum TriggerType {
+  FIXED_DATE
+  RELATIVE_TO_ISSUE_DATE
+  RELATIVE_TO_EXPIRY_DATE
+  RECURRENT
+  EVENT_BASED
+  WHEN_UPDATED
+  IMMEDIATE
+}
+
+enum ExternalProcessType {
+  CPRH
+  SISAM
+  SILIA
+  SEI
+  ANM
+  IBAMA
+  OUTRO
+}
+
+enum DeliveryType {
+  RELATORIO
+  COMUNICACAO
+  PROTOCOLO
+  EVIDENCIA
+  RENOVACAO
+  PRORROGACAO
+  OUTRO
+}
+
+enum ComplianceStatus {
+  ATENDE
+  ATENDE_PARCIALMENTE
+  NAO_ATENDE
+  NAO_APLICAVEL
+  PENDENTE
+  EM_VALIDACAO
+}
+
+enum AuthorizedResourceType {
+  MATERIAL
+  EQUIPMENT
+  TECHNICAL_TEAM
+  CONTRACTOR
+  AREA
+  OTHER
+}
+
+model Area {
+  id                 String             @id @default(uuid()) @db.Uuid
+  name               String
+  slug               String             @unique
+  status             RecordStatus       @default(ACTIVE)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  deletedAt          DateTime?
+  users              User[]
+  responsibleParties ResponsibleParty[]
+  workActivities     WorkActivity[]
+
+  @@index([status])
+  @@map("areas")
+}
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String           @unique
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  users       User[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(uuid()) @db.Uuid
+  action      String
+  resource    String
+  description String?
+  createdAt   DateTime         @default(now())
+  roles       RolePermission[]
+
+  @@unique([action, resource])
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String     @db.Uuid
+  permissionId String     @db.Uuid
+  createdAt    DateTime   @default(now())
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model User {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  name                  String
+  email                 String                 @unique
+  status                RecordStatus           @default(ACTIVE)
+  areaId                String?                @db.Uuid
+  roleId                String?                @db.Uuid
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  deletedAt             DateTime?
+  area                  Area?                  @relation(fields: [areaId], references: [id])
+  role                  Role?                  @relation(fields: [roleId], references: [id])
+  auditEvents           AuditEvent[]           @relation("AuditActor")
+  connectedSources      ConnectedSource[]      @relation("ConnectedSourceUser")
+  responsibilities      ResponsibleParty[]     @relation("ResponsibleUser")
+  validatedEvidences    Evidence[]             @relation("EvidenceValidator")
+  complianceAssessments ComplianceAssessment[] @relation("AssessmentAssessor")
+
+  @@index([areaId])
+  @@index([roleId])
+  @@index([status])
+  @@map("users")
+}
+
+model ConnectedSource {
+  id                    String             @id @default(uuid()) @db.Uuid
+  provider              SourceKind
+  displayName           String
+  connectionStatus      ConnectionStatus   @default(CONNECTED)
+  connectedByUserId     String?            @db.Uuid
+  connectedAt           DateTime           @default(now())
+  lastSyncAt            DateTime?
+  syncStatus            SyncStatus         @default(IDLE)
+  errorMessage          String?
+  encryptedCredentials  String?            @db.Text
+  credentialExpiresAt   DateTime?
+  scopes                String[]           @default([])
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  deletedAt             DateTime?
+  connectedByUser       User?              @relation("ConnectedSourceUser", fields: [connectedByUserId], references: [id])
+  monitoredFolders      MonitoredFolder[]
+  sourceDocuments       SourceDocument[]
+  importJobs            ImportJob[]
+
+  @@index([provider])
+  @@index([connectionStatus])
+  @@index([syncStatus])
+  @@index([connectedByUserId])
+  @@map("connected_sources")
+}
+
+model MonitoredFolder {
+  id                String           @id @default(uuid()) @db.Uuid
+  connectedSourceId String           @db.Uuid
+  driveFolderId     String
+  folderName        String
+  folderPath        String?
+  parentFolderId    String?
+  isActive          Boolean          @default(true)
+  lastScanAt        DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  connectedSource   ConnectedSource  @relation(fields: [connectedSourceId], references: [id], onDelete: Cascade)
+  sourceDocuments   SourceDocument[]
+  importJobs        ImportJob[]
+
+  @@unique([connectedSourceId, driveFolderId])
+  @@index([connectedSourceId])
+  @@index([isActive])
+  @@map("monitored_folders")
+}
+
+model SourceDocument {
+  id                String                     @id @default(uuid()) @db.Uuid
+  connectedSourceId String                     @db.Uuid
+  monitoredFolderId String                     @db.Uuid
+  provider          SourceKind                 @default(GOOGLE_DRIVE)
+  driveFileId       String
+  driveRevisionId   String?
+  driveWebUrl       String?
+  fileName          String
+  mimeType          String
+  fileExtension     String?
+  fileSize          BigInt?
+  checksum          String?
+  folderPath        String?
+  modifiedAtSource  DateTime?
+  createdAtSource   DateTime?
+  importStatus      SourceDocumentImportStatus @default(DETECTED)
+  lastImportedAt    DateTime?
+  errorMessage      String?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  connectedSource   ConnectedSource            @relation(fields: [connectedSourceId], references: [id], onDelete: Cascade)
+  monitoredFolder   MonitoredFolder            @relation(fields: [monitoredFolderId], references: [id], onDelete: Cascade)
+  documentVersions  DocumentVersion[]
+  documentMetadata  DocumentMetadata?
+  importJobs        ImportJob[]
+
+  @@unique([connectedSourceId, driveFileId])
+  @@index([connectedSourceId])
+  @@index([monitoredFolderId])
+  @@index([driveFileId])
+  @@index([importStatus])
+  @@index([modifiedAtSource])
+  @@map("source_documents")
+}
+
+model DocumentVersion {
+  id                     String           @id @default(uuid()) @db.Uuid
+  sourceDocumentId       String           @db.Uuid
+  revisionId             String
+  checksum               String?
+  storageObjectKey       String?
+  extractedTextObjectKey String?
+  extractedText          String?          @db.Text
+  extractionStatus       ExtractionStatus @default(PENDING)
+  extractionQuality      Float?
+  createdAt              DateTime         @default(now())
+  sourceDocument         SourceDocument   @relation(fields: [sourceDocumentId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceDocumentId, revisionId])
+  @@index([sourceDocumentId])
+  @@index([extractionStatus])
+  @@map("document_versions")
+}
+
+model DocumentMetadata {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  sourceDocumentId   String                 @unique @db.Uuid
+  documentType       IngestedDocumentType   @default(OUTRO)
+  issuingAuthority   String?
+  licenseNumber      String?
+  validUntil         DateTime?
+  issueDate          DateTime?
+  processNumber      String?
+  seiNumber          String?
+  authenticationCode String?
+  confidenceScore    Float?
+  metadataStatus     DocumentMetadataStatus @default(SUGGESTED)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  sourceDocument     SourceDocument         @relation(fields: [sourceDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([documentType])
+  @@index([metadataStatus])
+  @@index([validUntil])
+  @@map("document_metadata")
+}
+
+model ImportJob {
+  id                String          @id @default(uuid()) @db.Uuid
+  connectedSourceId String?         @db.Uuid
+  monitoredFolderId String?         @db.Uuid
+  sourceDocumentId  String?         @db.Uuid
+  jobType           ImportJobType
+  status            ImportJobStatus @default(QUEUED)
+  attempts          Int             @default(0)
+  startedAt         DateTime?
+  finishedAt        DateTime?
+  errorMessage      String?
+  correlationId     String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  connectedSource   ConnectedSource? @relation(fields: [connectedSourceId], references: [id], onDelete: SetNull)
+  monitoredFolder   MonitoredFolder? @relation(fields: [monitoredFolderId], references: [id], onDelete: SetNull)
+  sourceDocument    SourceDocument?  @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+
+  @@index([connectedSourceId])
+  @@index([monitoredFolderId])
+  @@index([sourceDocumentId])
+  @@index([jobType])
+  @@index([status])
+  @@index([correlationId])
+  @@map("import_jobs")
+}
+
+model WorkActivity {
+  id                 String             @id @default(uuid()) @db.Uuid
+  name               String
+  code               String             @unique
+  description        String?
+  location           String?
+  status             RecordStatus       @default(ACTIVE)
+  areaId             String?            @db.Uuid
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  deletedAt          DateTime?
+  area               Area?              @relation(fields: [areaId], references: [id])
+  licenses           License[]
+  responsibleParties ResponsibleParty[]
+
+  @@index([areaId])
+  @@index([status])
+  @@map("work_activities")
+}
+
+model License {
+  id                       String               @id @default(uuid()) @db.Uuid
+  workActivityId           String               @db.Uuid
+  number                   String
+  type                     String
+  licenseKind              LicenseKind          @default(OUTRO)
+  previousLicenseNumber    String?
+  issuingAgency            String
+  issuingAuthority         String?
+  processNumber            String?
+  sourceProtocolNumber     String?
+  authenticationCode       String?
+  siliaRequestNumber       String?
+  cprhProcessNumber        String?
+  sisamProcessNumber       String?
+  seiProcessNumber         String?
+  oficioSuapeNumber        String?
+  scope                    String?
+  activitySummary          String?
+  legalTypology            String?
+  location                 String?
+  requestingArea           String?
+  requestedAt              DateTime?
+  protocolAt               DateTime?
+  issuedAt                 DateTime?
+  validFrom                DateTime?
+  expiresAt                DateTime?
+  oldValidUntil            DateTime?
+  renewalDueAt             DateTime?
+  renewalDeadlineAuthority DateTime?
+  renewalDeadlineInternal  DateTime?
+  renewalRule              String?
+  status                   RecordStatus         @default(ACTIVE)
+  confidentiality          ConfidentialityLevel @default(INTERNAL)
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+  deletedAt                DateTime?
+  workActivity             WorkActivity         @relation(fields: [workActivityId], references: [id])
+  regulatoryClauses        RegulatoryClause[]
+  obligations              Obligation[]
+  evidences                Evidence[]
+  protocols                Protocol[]
+  responsibleParties       ResponsibleParty[]
+  deadlines                Deadline[]
+  riskSignals              RiskSignal[]
+  externalProcesses        ExternalProcess[]
+  officialLetters          OfficialLetter[]
+  deliveries               Delivery[]
+  infractionCases          InfractionCase[]
+  authorizedResources      AuthorizedResource[]
+
+  @@unique([workActivityId, number])
+  @@index([licenseKind])
+  @@index([issuingAgency])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([renewalDeadlineAuthority])
+  @@index([cprhProcessNumber])
+  @@index([seiProcessNumber])
+  @@map("licenses")
+}
+
+model RegulatoryClause {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  licenseId             String                 @db.Uuid
+  sourceDocumentId      String?                @db.Uuid
+  sourceRecordId        String?                @db.Uuid
+  sectionName           String?
+  clauseType            RegulatoryClauseType   @default(CONDICIONANTE)
+  itemCode              String
+  parentItemCode        String?
+  sequence              Int?
+  text                  String
+  periodicity           String?
+  isTrackable           Boolean                @default(true)
+  generatesObligation   Boolean                @default(false)
+  sourcePage            Int?
+  extractionConfidence  Float?
+  status                RecordStatus           @default(ACTIVE)
+  confidentiality       ConfidentialityLevel   @default(INTERNAL)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  deletedAt             DateTime?
+  license               License                @relation(fields: [licenseId], references: [id])
+  sourceDocument        DocumentAsset?         @relation("RegulatoryClauseSourceDocument", fields: [sourceDocumentId], references: [id])
+  sourceRecord          SourceRecord?          @relation("RegulatoryClauseSourceRecord", fields: [sourceRecordId], references: [id])
+  obligations           Obligation[]
+  evidences             Evidence[]
+  deadlines             Deadline[]
+  riskSignals           RiskSignal[]
+  complianceAssessments ComplianceAssessment[]
+  infractionCases       InfractionCase[]
+  authorizedResources   AuthorizedResource[]
+
+  @@unique([licenseId, clauseType, itemCode])
+  @@index([licenseId])
+  @@index([sourceDocumentId])
+  @@index([sourceRecordId])
+  @@index([clauseType])
+  @@index([parentItemCode])
+  @@index([status])
+  @@map("regulatory_clauses")
+}
+
+model Obligation {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  licenseId             String                 @db.Uuid
+  regulatoryClauseId    String?                @db.Uuid
+  responsiblePartyId    String?                @db.Uuid
+  title                 String
+  description           String?
+  obligationType        ObligationType         @default(ENTREGA_DOCUMENTAL)
+  triggerType           TriggerType?
+  dueDate               DateTime?
+  recurrenceRule        String?
+  deadlineAuthority     DateTime?
+  deadlineInternal      DateTime?
+  deadlineBasis         String?
+  weight                Decimal?               @db.Decimal(8, 2)
+  criticality           RiskSeverity?
+  status                RecordStatus           @default(PENDING)
+  confidentiality       ConfidentialityLevel   @default(INTERNAL)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  deletedAt             DateTime?
+  license               License                @relation(fields: [licenseId], references: [id])
+  regulatoryClause      RegulatoryClause?      @relation(fields: [regulatoryClauseId], references: [id])
+  primaryResponsible    ResponsibleParty?      @relation("ObligationPrimaryResponsible", fields: [responsiblePartyId], references: [id])
+  evidences             Evidence[]
+  protocols             Protocol[]
+  responsibleParties    ResponsibleParty[]     @relation("ObligationAssignments")
+  deadlines             Deadline[]
+  riskSignals           RiskSignal[]
+  occurrences           ObligationOccurrence[]
+  externalProcesses     ExternalProcess[]
+  deliveries            Delivery[]
+  complianceAssessments ComplianceAssessment[]
+
+  @@index([licenseId])
+  @@index([regulatoryClauseId])
+  @@index([responsiblePartyId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([deadlineAuthority])
+  @@index([deadlineInternal])
+  @@map("obligations")
+}
+
+model ObligationOccurrence {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  obligationId          String                 @db.Uuid
+  periodReference       String?
+  dueDateAuthority      DateTime?
+  dueDateInternal       DateTime?
+  status                DeadlineStatus         @default(SCHEDULED)
+  deliveryExpected      Boolean                @default(true)
+  seiProcessId          String?                @db.Uuid
+  calendarYear          Int?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  deletedAt             DateTime?
+  obligation            Obligation             @relation(fields: [obligationId], references: [id])
+  seiProcess            ExternalProcess?       @relation("OccurrenceSeiProcess", fields: [seiProcessId], references: [id])
+  deliveries            Delivery[]
+  protocols             Protocol[]
+  deadlines             Deadline[]
+  complianceAssessments ComplianceAssessment[]
+
+  @@index([obligationId])
+  @@index([seiProcessId])
+  @@index([status])
+  @@index([calendarYear])
+  @@index([dueDateAuthority])
+  @@index([dueDateInternal])
+  @@map("obligation_occurrences")
+}
+
+model DocumentAsset {
+  id                      String               @id @default(uuid()) @db.Uuid
+  fileName                String
+  kind                    DocumentKind         @default(OTHER)
+  mimeType                String
+  storageBucket           String
+  storageKey              String
+  version                 String
+  checksum                String
+  sizeBytes               BigInt?
+  extractedText           String?
+  indexedAt               DateTime?
+  status                  RecordStatus         @default(ACTIVE)
+  confidentiality         ConfidentialityLevel @default(INTERNAL)
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+  deletedAt               DateTime?
+  evidences               Evidence[]           @relation("EvidenceDocumentAsset")
+  protocolProofs          Protocol[]           @relation("ProtocolProofAsset")
+  sourceRecords           SourceRecord[]       @relation("SourceDocumentAsset")
+  regulatoryClauseSources RegulatoryClause[]   @relation("RegulatoryClauseSourceDocument")
+  deliveryProofs          Delivery[]           @relation("DeliveryProofAsset")
+  deliveryEvidenceDocs    Delivery[]           @relation("DeliveryEvidenceAsset")
+  officialLetters         OfficialLetter[]     @relation("OfficialLetterDocumentAsset")
+
+  @@unique([storageBucket, storageKey, version])
+  @@index([checksum])
+  @@index([status])
+  @@map("document_assets")
+}
+
+model SourceRecord {
+  id                String             @id @default(uuid()) @db.Uuid
+  sourceKind        SourceKind
+  externalId        String?
+  fileId            String?
+  spreadsheetId     String?
+  sheetName         String?
+  rowNumber         Int?
+  cellRange         String?
+  pageNumber        Int?
+  sectionName       String?
+  itemCode          String?
+  version           String?
+  capturedAt        DateTime           @default(now())
+  originUser        String?
+  rawMetadata       Json?
+  importStatus      ImportStatus       @default(PENDING)
+  status            RecordStatus       @default(ACTIVE)
+  documentAssetId   String?            @db.Uuid
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deletedAt         DateTime?
+  documentAsset     DocumentAsset?     @relation("SourceDocumentAsset", fields: [documentAssetId], references: [id])
+  evidences         Evidence[]         @relation("EvidenceSourceRecord")
+  regulatoryClauses RegulatoryClause[] @relation("RegulatoryClauseSourceRecord")
+
+  @@index([sourceKind])
+  @@index([fileId])
+  @@index([spreadsheetId, sheetName, rowNumber])
+  @@index([sheetName, cellRange])
+  @@index([documentAssetId, pageNumber])
+  @@index([importStatus])
+  @@map("source_records")
+}
+
+model Evidence {
+  id                 String               @id @default(uuid()) @db.Uuid
+  title              String
+  description        String?
+  documentAssetId    String               @db.Uuid
+  sourceRecordId     String?              @db.Uuid
+  licenseId          String?              @db.Uuid
+  regulatoryClauseId String?              @db.Uuid
+  obligationId       String?              @db.Uuid
+  protocolId         String?              @db.Uuid
+  deliveryId         String?              @db.Uuid
+  responsiblePartyId String?              @db.Uuid
+  confidentiality    ConfidentialityLevel @default(INTERNAL)
+  status             RecordStatus         @default(PENDING)
+  validatedAt        DateTime?
+  validatedById      String?              @db.Uuid
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  deletedAt          DateTime?
+  documentAsset      DocumentAsset        @relation("EvidenceDocumentAsset", fields: [documentAssetId], references: [id])
+  sourceRecord       SourceRecord?        @relation("EvidenceSourceRecord", fields: [sourceRecordId], references: [id])
+  license            License?             @relation(fields: [licenseId], references: [id])
+  regulatoryClause   RegulatoryClause?    @relation(fields: [regulatoryClauseId], references: [id])
+  obligation         Obligation?          @relation(fields: [obligationId], references: [id])
+  protocol           Protocol?            @relation(fields: [protocolId], references: [id])
+  delivery           Delivery?            @relation(fields: [deliveryId], references: [id])
+  responsibleParty   ResponsibleParty?    @relation(fields: [responsiblePartyId], references: [id])
+  validatedBy        User?                @relation("EvidenceValidator", fields: [validatedById], references: [id])
+
+  @@index([documentAssetId])
+  @@index([sourceRecordId])
+  @@index([licenseId])
+  @@index([regulatoryClauseId])
+  @@index([obligationId])
+  @@index([protocolId])
+  @@index([deliveryId])
+  @@index([status])
+  @@map("evidences")
+}
+
+model Protocol {
+  id                     String                @id @default(uuid()) @db.Uuid
+  licenseId              String                @db.Uuid
+  obligationId           String?               @db.Uuid
+  obligationOccurrenceId String?               @db.Uuid
+  externalProcessId      String?               @db.Uuid
+  number                 String
+  agency                 String
+  system                 String?
+  submittedAt            DateTime?
+  status                 RecordStatus          @default(PENDING)
+  proofAssetId           String?               @db.Uuid
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  deletedAt              DateTime?
+  license                License               @relation(fields: [licenseId], references: [id])
+  obligation             Obligation?           @relation(fields: [obligationId], references: [id])
+  obligationOccurrence   ObligationOccurrence? @relation(fields: [obligationOccurrenceId], references: [id])
+  externalProcess        ExternalProcess?      @relation(fields: [externalProcessId], references: [id])
+  proofAsset             DocumentAsset?        @relation("ProtocolProofAsset", fields: [proofAssetId], references: [id])
+  evidences              Evidence[]
+  deliveries             Delivery[]
+
+  @@index([licenseId])
+  @@index([obligationId])
+  @@index([obligationOccurrenceId])
+  @@index([externalProcessId])
+  @@index([number])
+  @@index([status])
+  @@map("protocols")
+}
+
+model ResponsibleParty {
+  id                  String               @id @default(uuid()) @db.Uuid
+  name                String
+  type                ResponsiblePartyType
+  email               String?
+  documentNumber      String?
+  professionalRecord  String?
+  roleDescription     String?
+  isApprover          Boolean              @default(false)
+  isPointOfContact    Boolean              @default(false)
+  status              RecordStatus         @default(ACTIVE)
+  areaId              String?              @db.Uuid
+  userId              String?              @db.Uuid
+  workActivityId      String?              @db.Uuid
+  licenseId           String?              @db.Uuid
+  obligationId        String?              @db.Uuid
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  deletedAt           DateTime?
+  area                Area?                @relation(fields: [areaId], references: [id])
+  user                User?                @relation("ResponsibleUser", fields: [userId], references: [id])
+  workActivity        WorkActivity?        @relation(fields: [workActivityId], references: [id])
+  license             License?             @relation(fields: [licenseId], references: [id])
+  obligation          Obligation?          @relation("ObligationAssignments", fields: [obligationId], references: [id])
+  primaryObligations  Obligation[]         @relation("ObligationPrimaryResponsible")
+  evidences           Evidence[]
+  deadlines           Deadline[]
+  authorizedResources AuthorizedResource[]
+
+  @@index([areaId])
+  @@index([userId])
+  @@index([workActivityId])
+  @@index([licenseId])
+  @@index([obligationId])
+  @@index([status])
+  @@map("responsible_parties")
+}
+
+model Deadline {
+  id                     String                @id @default(uuid()) @db.Uuid
+  title                  String
+  dueDate                DateTime
+  completedAt            DateTime?
+  recurrenceRule         String?
+  status                 DeadlineStatus        @default(SCHEDULED)
+  licenseId              String?               @db.Uuid
+  regulatoryClauseId     String?               @db.Uuid
+  obligationId           String?               @db.Uuid
+  obligationOccurrenceId String?               @db.Uuid
+  responsiblePartyId     String?               @db.Uuid
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  deletedAt              DateTime?
+  license                License?              @relation(fields: [licenseId], references: [id])
+  regulatoryClause       RegulatoryClause?     @relation(fields: [regulatoryClauseId], references: [id])
+  obligation             Obligation?           @relation(fields: [obligationId], references: [id])
+  obligationOccurrence   ObligationOccurrence? @relation(fields: [obligationOccurrenceId], references: [id])
+  responsibleParty       ResponsibleParty?     @relation(fields: [responsiblePartyId], references: [id])
+  riskSignals            RiskSignal[]
+
+  @@index([dueDate])
+  @@index([status])
+  @@index([licenseId])
+  @@index([regulatoryClauseId])
+  @@index([obligationId])
+  @@index([obligationOccurrenceId])
+  @@map("deadlines")
+}
+
+model ExternalProcess {
+  id                         String                 @id @default(uuid()) @db.Uuid
+  processType                ExternalProcessType
+  processNumber              String
+  licenseId                  String?                @db.Uuid
+  obligationId               String?                @db.Uuid
+  status                     RecordStatus           @default(PENDING)
+  openedAt                   DateTime?
+  protocolAt                 DateTime?
+  description                String?
+  createdAt                  DateTime               @default(now())
+  updatedAt                  DateTime               @updatedAt
+  deletedAt                  DateTime?
+  license                    License?               @relation(fields: [licenseId], references: [id])
+  obligation                 Obligation?            @relation(fields: [obligationId], references: [id])
+  protocols                  Protocol[]
+  officialLetters            OfficialLetter[]
+  obligationOccurrencesAsSei ObligationOccurrence[] @relation("OccurrenceSeiProcess")
+
+  @@unique([processType, processNumber])
+  @@index([licenseId])
+  @@index([obligationId])
+  @@index([status])
+  @@map("external_processes")
+}
+
+model OfficialLetter {
+  id                String           @id @default(uuid()) @db.Uuid
+  number            String
+  issuer            String
+  recipient         String?
+  issuedAt          DateTime?
+  description       String?
+  licenseId         String?          @db.Uuid
+  externalProcessId String?          @db.Uuid
+  documentAssetId   String?          @db.Uuid
+  status            RecordStatus     @default(ACTIVE)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  deletedAt         DateTime?
+  license           License?         @relation(fields: [licenseId], references: [id])
+  externalProcess   ExternalProcess? @relation(fields: [externalProcessId], references: [id])
+  documentAsset     DocumentAsset?   @relation("OfficialLetterDocumentAsset", fields: [documentAssetId], references: [id])
+
+  @@index([number])
+  @@index([licenseId])
+  @@index([externalProcessId])
+  @@index([status])
+  @@map("official_letters")
+}
+
+model Delivery {
+  id                     String                @id @default(uuid()) @db.Uuid
+  licenseId              String?               @db.Uuid
+  obligationId           String?               @db.Uuid
+  obligationOccurrenceId String?               @db.Uuid
+  deliveryType           DeliveryType          @default(OUTRO)
+  submittedAt            DateTime?
+  recipientAuthority     String?
+  protocolNumber         String?
+  proofDocumentId        String?               @db.Uuid
+  evidenceDocumentId     String?               @db.Uuid
+  protocolId             String?               @db.Uuid
+  status                 RecordStatus          @default(PENDING)
+  notes                  String?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  deletedAt              DateTime?
+  license                License?              @relation(fields: [licenseId], references: [id])
+  obligation             Obligation?           @relation(fields: [obligationId], references: [id])
+  obligationOccurrence   ObligationOccurrence? @relation(fields: [obligationOccurrenceId], references: [id])
+  proofDocument          DocumentAsset?        @relation("DeliveryProofAsset", fields: [proofDocumentId], references: [id])
+  evidenceDocument       DocumentAsset?        @relation("DeliveryEvidenceAsset", fields: [evidenceDocumentId], references: [id])
+  protocol               Protocol?             @relation(fields: [protocolId], references: [id])
+  evidences              Evidence[]
+
+  @@index([licenseId])
+  @@index([obligationId])
+  @@index([obligationOccurrenceId])
+  @@index([protocolId])
+  @@index([protocolNumber])
+  @@index([status])
+  @@map("deliveries")
+}
+
+model ComplianceAssessment {
+  id                 String                @id @default(uuid()) @db.Uuid
+  regulatoryClauseId String?               @db.Uuid
+  obligationId       String?               @db.Uuid
+  occurrenceId       String?               @db.Uuid
+  status             ComplianceStatus      @default(PENDENTE)
+  weight             Decimal?              @db.Decimal(8, 2)
+  score              Decimal?              @db.Decimal(8, 2)
+  assessedById       String?               @db.Uuid
+  assessedAt         DateTime?
+  justification      String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  deletedAt          DateTime?
+  regulatoryClause   RegulatoryClause?     @relation(fields: [regulatoryClauseId], references: [id])
+  obligation         Obligation?           @relation(fields: [obligationId], references: [id])
+  occurrence         ObligationOccurrence? @relation(fields: [occurrenceId], references: [id])
+  assessedBy         User?                 @relation("AssessmentAssessor", fields: [assessedById], references: [id])
+
+  @@index([regulatoryClauseId])
+  @@index([obligationId])
+  @@index([occurrenceId])
+  @@index([status])
+  @@map("compliance_assessments")
+}
+
+model InfractionCase {
+  id                       String            @id @default(uuid()) @db.Uuid
+  object                   String
+  infractionNumber         String
+  seiProcessNumber         String?
+  cprhProcessNumber        String?
+  infractionType           String?
+  status                   RecordStatus      @default(PENDING)
+  linkedLicenseId          String?           @db.Uuid
+  linkedRegulatoryClauseId String?           @db.Uuid
+  notes                    String?
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+  deletedAt                DateTime?
+  linkedLicense            License?          @relation(fields: [linkedLicenseId], references: [id])
+  linkedRegulatoryClause   RegulatoryClause? @relation(fields: [linkedRegulatoryClauseId], references: [id])
+
+  @@unique([infractionNumber])
+  @@index([linkedLicenseId])
+  @@index([linkedRegulatoryClauseId])
+  @@index([status])
+  @@map("infraction_cases")
+}
+
+model AuthorizedResource {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  licenseId          String                 @db.Uuid
+  regulatoryClauseId String?                @db.Uuid
+  responsiblePartyId String?                @db.Uuid
+  type               AuthorizedResourceType
+  name               String
+  identifier         String?
+  professionalRecord String?
+  roleDescription    String?
+  quantity           Decimal?               @db.Decimal(10, 2)
+  notes              String?
+  status             RecordStatus           @default(ACTIVE)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  deletedAt          DateTime?
+  license            License                @relation(fields: [licenseId], references: [id])
+  regulatoryClause   RegulatoryClause?      @relation(fields: [regulatoryClauseId], references: [id])
+  responsibleParty   ResponsibleParty?      @relation(fields: [responsiblePartyId], references: [id])
+
+  @@index([licenseId])
+  @@index([regulatoryClauseId])
+  @@index([responsiblePartyId])
+  @@index([type])
+  @@index([status])
+  @@map("authorized_resources")
+}
+
+model RiskSignal {
+  id                 String            @id @default(uuid()) @db.Uuid
+  kind               RiskKind
+  severity           RiskSeverity
+  reason             String
+  status             RecordStatus      @default(ACTIVE)
+  licenseId          String?           @db.Uuid
+  regulatoryClauseId String?           @db.Uuid
+  obligationId       String?           @db.Uuid
+  deadlineId         String?           @db.Uuid
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  resolvedAt         DateTime?
+  license            License?          @relation(fields: [licenseId], references: [id])
+  regulatoryClause   RegulatoryClause? @relation(fields: [regulatoryClauseId], references: [id])
+  obligation         Obligation?       @relation(fields: [obligationId], references: [id])
+  deadline           Deadline?         @relation(fields: [deadlineId], references: [id])
+
+  @@index([kind])
+  @@index([severity])
+  @@index([status])
+  @@index([regulatoryClauseId])
+  @@map("risk_signals")
+}
+
+model AuditEvent {
+  id            String      @id @default(uuid()) @db.Uuid
+  actorUserId   String?     @db.Uuid
+  action        AuditAction
+  resource      String
+  resourceId    String?
+  previousData  Json?
+  newData       Json?
+  reason        String?
+  sourceIp      String?
+  correlationId String?
+  createdAt     DateTime    @default(now())
+  actorUser     User?       @relation("AuditActor", fields: [actorUserId], references: [id])
+
+  @@index([actorUserId])
+  @@index([action])
+  @@index([resource, resourceId])
+  @@index([createdAt])
+  @@map("audit_events")
+}
