@@ -33,6 +33,7 @@ import {
   GoogleDriveFile,
   StoredGoogleOAuthCredentials,
 } from './google-drive-api.client';
+import { GOOGLE_DRIVE_FOLDER_MIME_TYPE } from './google-drive.constants';
 import { GoogleDriveConfigService } from './google-drive-config.service';
 import {
   ConnectGoogleDriveDto,
@@ -317,15 +318,22 @@ export class GoogleDriveIngestionService {
     const folders = await this.getFoldersForSync(input);
     const result = {
       foldersScanned: 0,
+      foldersDetected: 0,
       documentsDetected: 0,
       jobsCreated: 0,
       errors: [] as Array<{ folderId: string; message: string }>,
     };
+    const visitedFolderIds = new Set<string>();
 
     for (const folder of folders) {
       try {
-        const folderResult = await this.scanFolder(folder, randomUUID());
-        result.foldersScanned += 1;
+        const folderResult = await this.scanFolder({
+          correlationId: randomUUID(),
+          folder,
+          visitedFolderIds,
+        });
+        result.foldersScanned += folderResult.foldersScanned;
+        result.foldersDetected += folderResult.foldersDetected;
         result.documentsDetected += folderResult.documentsDetected;
         result.jobsCreated += folderResult.jobsCreated;
       } catch (error) {
@@ -421,7 +429,11 @@ export class GoogleDriveIngestionService {
     }
 
     if (job.monitoredFolder) {
-      await this.scanFolder(job.monitoredFolder, job.correlationId ?? randomUUID());
+      await this.scanFolder({
+        correlationId: job.correlationId ?? randomUUID(),
+        folder: job.monitoredFolder,
+        visitedFolderIds: new Set<string>(),
+      });
 
       return this.getJob(jobId);
     }
@@ -667,9 +679,25 @@ export class GoogleDriveIngestionService {
   }
 
   private async scanFolder(
-    folder: MonitoredFolderWithSource,
-    correlationId: string,
+    input: {
+      correlationId: string;
+      folder: MonitoredFolderWithSource;
+      visitedFolderIds: Set<string>;
+    },
   ) {
+    const { correlationId, folder, visitedFolderIds } = input;
+
+    if (visitedFolderIds.has(folder.driveFolderId)) {
+      return {
+        foldersScanned: 0,
+        foldersDetected: 0,
+        documentsDetected: 0,
+        jobsCreated: 0,
+      };
+    }
+
+    visitedFolderIds.add(folder.driveFolderId);
+
     const scanJob = await this.prisma.importJob.create({
       data: {
         connectedSourceId: folder.connectedSourceId,
@@ -681,7 +709,12 @@ export class GoogleDriveIngestionService {
         correlationId,
       },
     });
-    const result = { documentsDetected: 0, jobsCreated: 0 };
+    const result = {
+      foldersScanned: 1,
+      foldersDetected: 0,
+      documentsDetected: 0,
+      jobsCreated: 0,
+    };
 
     try {
       await this.prisma.connectedSource.update({
@@ -693,12 +726,31 @@ export class GoogleDriveIngestionService {
       let pageToken: string | undefined;
 
       do {
-        const page = await this.api.listFilesInFolder(accessToken, {
+        const page = await this.api.listChildrenInFolder(accessToken, {
           folderId: folder.driveFolderId,
           pageToken,
         });
 
         for (const file of page.files ?? []) {
+          if (file.mimeType === GOOGLE_DRIVE_FOLDER_MIME_TYPE) {
+            const detectedFolder = await this.upsertDetectedFolder({
+              file,
+              parentFolder: folder,
+            });
+            const childResult = await this.scanFolder({
+              correlationId,
+              folder: detectedFolder,
+              visitedFolderIds,
+            });
+
+            result.foldersScanned += childResult.foldersScanned;
+            result.foldersDetected += 1 + childResult.foldersDetected;
+            result.documentsDetected += childResult.documentsDetected;
+            result.jobsCreated += childResult.jobsCreated;
+
+            continue;
+          }
+
           const detected = await this.upsertDetectedFile({
             accessToken,
             correlationId,
@@ -753,6 +805,42 @@ export class GoogleDriveIngestionService {
 
       throw error;
     }
+  }
+
+  private async upsertDetectedFolder(input: {
+    file: GoogleDriveFile;
+    parentFolder: MonitoredFolderWithSource;
+  }): Promise<MonitoredFolderWithSource> {
+    const folderPath = this.joinDrivePath(
+      input.parentFolder.folderPath,
+      input.file.name,
+    );
+
+    const folder = await this.prisma.monitoredFolder.upsert({
+      where: {
+        connectedSourceId_driveFolderId: {
+          connectedSourceId: input.parentFolder.connectedSourceId,
+          driveFolderId: input.file.id,
+        },
+      },
+      create: {
+        connectedSourceId: input.parentFolder.connectedSourceId,
+        driveFolderId: input.file.id,
+        folderName: input.file.name,
+        folderPath,
+        parentFolderId: input.parentFolder.driveFolderId,
+        isActive: true,
+      },
+      update: {
+        folderName: input.file.name,
+        folderPath,
+        parentFolderId: input.parentFolder.driveFolderId,
+        isActive: true,
+      },
+      include: { connectedSource: true },
+    });
+
+    return folder;
   }
 
   private async upsertDetectedFile(input: {
@@ -1113,6 +1201,16 @@ export class GoogleDriveIngestionService {
     const [, extension] = /(?:\.([^.]+))?$/.exec(file.name) ?? [];
 
     return extension?.toLowerCase();
+  }
+
+  private joinDrivePath(parentPath: string | null, folderName: string) {
+    const normalizedParent = parentPath?.trim();
+
+    if (!normalizedParent || normalizedParent === '/') {
+      return `/${folderName}`;
+    }
+
+    return `${normalizedParent.replace(/\/$/, '')}/${folderName}`;
   }
 
   private toBigInt(value?: string) {

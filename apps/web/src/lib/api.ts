@@ -68,6 +68,7 @@ export type DashboardData = {
 
 export type SyncResult = {
   foldersScanned: number;
+  foldersDetected: number;
   documentsDetected: number;
   jobsCreated: number;
   errors: Array<{ folderId: string; message: string }>;

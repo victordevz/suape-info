@@ -157,6 +157,19 @@ export class GoogleDriveApiClient {
     });
   }
 
+  async listChildrenInFolder(
+    accessToken: string,
+    input: { folderId: string; pageToken?: string },
+  ) {
+    return this.listFiles(accessToken, {
+      q: [
+        `'${this.escapeDriveQueryValue(input.folderId)}' in parents`,
+        'trashed = false',
+      ].join(' and '),
+      pageToken: input.pageToken,
+    });
+  }
+
   async getFile(accessToken: string, fileId: string) {
     const url = new URL(`${GOOGLE_DRIVE_API_URL}/files/${fileId}`);
     url.searchParams.set('fields', FILE_FIELDS);
