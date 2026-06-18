@@ -21,10 +21,18 @@ export class RagRetrievalService {
     const terms = this.tokenize(input.query);
 
     if (terms.length === 0) {
+      const answerDraft = 'Consulta sem termos suficientes para recuperar fontes.';
+
       return {
         query: input.query,
         citations: [],
-        answerDraft: 'Consulta sem termos suficientes para recuperar fontes.',
+        answer: answerDraft,
+        answerDraft,
+        llm: {
+          provider: 'openai',
+          model: null,
+          status: 'not_configured',
+        },
       };
     }
 
@@ -49,10 +57,18 @@ export class RagRetrievalService {
       .sort((a, b) => b.score - a.score)
       .slice(0, input.take ?? 8);
 
+    const answerDraft = this.buildAnswerDraft(input.query, citations);
+
     return {
       query: input.query,
       citations,
-      answerDraft: this.buildAnswerDraft(input.query, citations),
+      answer: answerDraft,
+      answerDraft,
+      llm: {
+        provider: 'openai',
+        model: null,
+        status: 'not_configured',
+      },
     };
   }
 

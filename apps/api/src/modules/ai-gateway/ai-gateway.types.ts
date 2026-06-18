@@ -9,6 +9,7 @@ import type {
 export type AgentCapability =
   | 'drive_rag_retrieval'
   | 'document_intelligence'
+  | 'document_triage'
   | 'license_triage'
   | 'citation_guard';
 
@@ -29,6 +30,52 @@ export type LicenseTriageInput = {
   licenseId?: string;
   query?: string;
   take?: number;
+};
+
+export type DocumentTriageInput = {
+  sourceRecordId?: string;
+  spreadsheetId?: string;
+  sheetName?: string;
+  licenseId?: string;
+  take?: number;
+};
+
+export type TriageFieldSource =
+  | 'DATABASE'
+  | 'SPREADSHEET'
+  | 'PDF'
+  | 'DRIVE_DOCUMENT'
+  | 'LLM_INFERENCE';
+
+export type TriageFieldStatus =
+  | 'confirmed'
+  | 'suggested'
+  | 'conflict'
+  | 'missing';
+
+export type TriageField<T = string> = {
+  value: T | null;
+  source: TriageFieldSource | null;
+  citation: string | null;
+  confidence: number;
+  status: TriageFieldStatus;
+  candidates: Array<{
+    value: T;
+    source: TriageFieldSource;
+    citation: string | null;
+    confidence: number;
+  }>;
+};
+
+export type TriageConflict = {
+  field: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH';
+  values: Array<{
+    value: string;
+    source: TriageFieldSource;
+    citation: string | null;
+  }>;
+  recommendation: string;
 };
 
 export type RagCitation = {
@@ -53,7 +100,14 @@ export type RagCitation = {
 export type RagQueryResult = {
   query: string;
   citations: RagCitation[];
+  answer: string;
   answerDraft: string;
+  llm: {
+    provider: 'openai';
+    model: string | null;
+    status: 'used' | 'not_configured' | 'failed';
+    errorMessage?: string;
+  };
 };
 
 export type DocumentIntelligenceResult = {
@@ -93,4 +147,143 @@ export type LicenseTriageResult = {
     reason: string;
   }>;
   citations: RagCitation[];
+};
+
+export type DocumentTriageResult = {
+  generatedAt: string;
+  mode: 'spreadsheet_rows_to_normalized_triage';
+  filters: DocumentTriageInput;
+  totals: {
+    sourceRows: number;
+    triagedRows: number;
+    rowsMissingNormalizedClause: number;
+  };
+  rows: DocumentTriageRow[];
+};
+
+export type LicenseTriageSheetResult = {
+  licenseId: string | null;
+  generatedAt: string;
+  triageStatus: 'ready_for_review' | 'needs_review' | 'needs_evidence' | 'needs_normalization';
+  fields: {
+    licenseNumber: TriageField<string>;
+    licenseType: TriageField<string>;
+    licenseKind: TriageField<string>;
+    issuingAgency: TriageField<string>;
+    issueDate: TriageField<string>;
+    expiresAt: TriageField<string>;
+    cprhProcessNumber: TriageField<string>;
+    seiProcessNumber: TriageField<string>;
+    triageCompliance: TriageField<ComplianceStatus>;
+    itemCode: TriageField<string>;
+    weight: TriageField<number>;
+    score: TriageField<number>;
+  };
+  conditions: Array<{
+    id: string;
+    itemCode: string;
+    clauseType: string;
+    text: string;
+    sourceRecordId: string | null;
+    sourceDocumentId: string | null;
+  }>;
+  obligations: Array<{
+    id: string;
+    title: string;
+    status: RecordStatus;
+    dueDate: Date | null;
+    deadlineInternal: Date | null;
+    deadlineAuthority: Date | null;
+    criticality: string | null;
+  }>;
+  conflicts: TriageConflict[];
+  sources: Array<{
+    label: string;
+    source: TriageFieldSource;
+    fileName?: string;
+    driveWebUrl?: string | null;
+    sourceRecordId?: string;
+    documentVersionId?: string;
+    extractionQuality?: number | null;
+  }>;
+  rows: DocumentTriageRow[];
+};
+
+export type DocumentTriageRow = {
+  source: {
+    sourceRecordId: string;
+    sourceKind: string;
+    spreadsheetId: string | null;
+    sheetName: string | null;
+    rowNumber: number | null;
+    cellRange: string | null;
+    itemCode: string | null;
+    documentAsset: {
+      id: string;
+      fileName: string;
+      mimeType: string;
+      checksum: string;
+    } | null;
+    rawMetadata: unknown;
+  };
+  normalized: {
+    license: {
+      id: string;
+      number: string;
+      type: string;
+      licenseKind: string;
+      issuingAgency: string;
+      expiresAt: Date | null;
+      status: RecordStatus;
+    } | null;
+    regulatoryClause: {
+      id: string;
+      itemCode: string;
+      clauseType: string;
+      text: string;
+      periodicity: string | null;
+      status: RecordStatus;
+    } | null;
+    obligation: {
+      id: string;
+      title: string;
+      status: RecordStatus;
+      dueDate: Date | null;
+      deadlineInternal: Date | null;
+      deadlineAuthority: Date | null;
+      criticality: string | null;
+    } | null;
+    compliance: {
+      status: ComplianceStatus;
+      weight: number | null;
+      score: number | null;
+      justification: string | null;
+    } | null;
+  };
+  triageColumns: {
+    atende: boolean;
+    atendeParcialmente: boolean;
+    naoAtende: boolean;
+    pendente: boolean;
+    naoAplicavel: boolean;
+    emValidacao: boolean;
+    peso: number | null;
+    ponderacao: number | null;
+  };
+  correlations: {
+    documentAssets: Array<{
+      id: string;
+      fileName: string;
+      kind: string;
+      mimeType: string;
+      source: 'spreadsheet' | 'regulatory_clause' | 'evidence';
+    }>;
+    ragCitations: RagCitation[];
+  };
+  triage: {
+    status: 'ready_for_review' | 'needs_evidence' | 'needs_normalization';
+    confidence: number;
+    reasons: string[];
+    nextActions: string[];
+  };
 };

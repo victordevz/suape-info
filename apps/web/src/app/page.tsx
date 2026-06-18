@@ -2,6 +2,7 @@ import {
   getDashboardData,
   type SourceDocument,
 } from '@/lib/api';
+import { RemoveFolderButton } from './remove-folder-button';
 import { SyncDiagnostics } from './sync-diagnostics';
 
 const documentsPerPage = 20;
@@ -65,13 +66,14 @@ export default async function Home({
           <div className="section-title">Pastas conectadas</div>
           {data.folders.length > 0 ? (
             data.folders.map((folder) => (
-              <button className="folder-item" key={folder.id}>
+              <div className="folder-item" key={folder.id}>
                 <span className={folder.isActive ? 'dot active' : 'dot muted'} />
-                <span>
+                <span className="folder-copy">
                   <strong>{folder.folderName}</strong>
                   <small>{folder.folderPath ?? 'Caminho nao informado'}</small>
                 </span>
-              </button>
+                <RemoveFolderButton folderName={folder.folderName} id={folder.id} />
+              </div>
             ))
           ) : (
             <div className="empty-card">

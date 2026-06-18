@@ -193,3 +193,18 @@ export async function runGoogleDriveSync(input?: {
 
   return response.json() as Promise<SyncResult>;
 }
+
+export async function removeMonitoredFolder(id: string) {
+  const response = await fetch(`${getBrowserSafeApiUrl()}/monitored-folders/${id}`, {
+    method: 'DELETE',
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+
+    throw new Error(`Falha ao remover pasta monitorada (${response.status}): ${message}`);
+  }
+
+  return response.json() as Promise<MonitoredFolder>;
+}

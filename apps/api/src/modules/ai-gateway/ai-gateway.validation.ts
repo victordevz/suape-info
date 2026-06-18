@@ -7,6 +7,7 @@ import {
   requiredString,
 } from '../ingestion/ingestion.validation';
 import type { LicenseTriageInput, RagQueryInput } from './ai-gateway.types';
+import type { DocumentTriageInput } from './ai-gateway.types';
 
 export function parseRagQueryInput(body: unknown): RagQueryInput {
   const input = asRecord(body);
@@ -31,6 +32,18 @@ export function parseLicenseTriageInput(body: unknown): LicenseTriageInput {
   return {
     licenseId,
     query,
+    take: parseTake(input.take),
+  };
+}
+
+export function parseDocumentTriageInput(body: unknown): DocumentTriageInput {
+  const input = asRecord(body);
+
+  return {
+    sourceRecordId: optionalUuid(input.sourceRecordId, 'sourceRecordId'),
+    spreadsheetId: optionalString(input.spreadsheetId, 'spreadsheetId'),
+    sheetName: optionalString(input.sheetName, 'sheetName'),
+    licenseId: optionalUuid(input.licenseId, 'licenseId'),
     take: parseTake(input.take),
   };
 }

@@ -306,6 +306,7 @@ export class GoogleDriveApiClient {
   private isDirectExtractionSupported(mimeType: string) {
     return (
       mimeType === 'application/pdf' ||
+      mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
       mimeType === 'text/csv' ||
       mimeType === 'application/csv' ||
       mimeType === 'application/json' ||

@@ -17,6 +17,7 @@ Este projeto deve tratar o Google Drive como fonte viva de conhecimento, mas nao
 ## Endpoints adicionados
 
 - `GET /api/ai-gateway/status`
+- `GET /api/ai-gateway/llm/validate`
 - `POST /api/ai-gateway/rag/query`
 - `POST /api/ai-gateway/licenses/triage`
 - `GET /api/ai-gateway/documents/:id/intelligence`

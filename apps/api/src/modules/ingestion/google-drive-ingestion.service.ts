@@ -488,6 +488,7 @@ export class GoogleDriveIngestionService {
       where: {
         connectedSourceId,
         monitoredFolderId,
+        monitoredFolder: monitoredFolderId ? undefined : { isActive: true },
         importStatus,
         fileName: q ? { contains: q, mode: 'insensitive' } : undefined,
       },
@@ -515,6 +516,7 @@ export class GoogleDriveIngestionService {
     );
     const where = {
       connectedSourceId,
+      monitoredFolder: { isActive: true },
     } satisfies Prisma.SourceDocumentWhereInput;
 
     const [total, imported, extracted, pending, failed, linked] = await Promise.all([
@@ -964,6 +966,28 @@ export class GoogleDriveIngestionService {
     });
   }
 
+  private shouldRetryExtraction(
+    file: GoogleDriveFile,
+    extractionStatus?: ExtractionStatus | null,
+  ) {
+    if (
+      extractionStatus !== ExtractionStatus.FAILED &&
+      extractionStatus !== ExtractionStatus.SKIPPED
+    ) {
+      return false;
+    }
+
+    return (
+      file.mimeType === 'application/pdf' ||
+      file.mimeType ===
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      file.mimeType === 'text/csv' ||
+      file.mimeType === 'application/csv' ||
+      file.mimeType === 'application/json' ||
+      file.mimeType.startsWith('text/')
+    );
+  }
+
   private async upsertDetectedFile(input: {
     accessToken: string;
     correlationId: string;
@@ -979,10 +1003,21 @@ export class GoogleDriveIngestionService {
         },
       },
     });
+    const existingVersion = existing
+      ? await this.prisma.documentVersion.findUnique({
+          where: {
+            sourceDocumentId_revisionId: {
+              sourceDocumentId: existing.id,
+              revisionId,
+            },
+          },
+        })
+      : null;
     const changed =
       !existing ||
       existing.driveRevisionId !== revisionId ||
-      existing.checksum !== (input.file.md5Checksum ?? null);
+      existing.checksum !== (input.file.md5Checksum ?? null) ||
+      this.shouldRetryExtraction(input.file, existingVersion?.extractionStatus);
     const data = {
       monitoredFolderId: input.folder.id,
       provider: SourceKind.GOOGLE_DRIVE,
