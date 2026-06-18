@@ -13,6 +13,11 @@ export class DocumentsController {
     return this.ingestion.listDocuments(query);
   }
 
+  @Get('stats')
+  stats(@Query() query: unknown) {
+    return this.ingestion.getDocumentStats(query);
+  }
+
   @Get(':id')
   get(@Param('id') id: string) {
     return this.ingestion.getDocument(id);

@@ -227,6 +227,7 @@ export class GoogleDriveApiClient {
     url.searchParams.set('fields', `nextPageToken, files(${FILE_FIELDS})`);
     url.searchParams.set('supportsAllDrives', 'true');
     url.searchParams.set('includeItemsFromAllDrives', 'true');
+    url.searchParams.set('corpora', 'allDrives');
 
     if (input.pageToken) {
       url.searchParams.set('pageToken', input.pageToken);

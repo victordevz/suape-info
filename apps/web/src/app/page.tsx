@@ -1,9 +1,10 @@
-import { revalidatePath } from 'next/cache';
 import {
   getDashboardData,
-  runGoogleDriveSync,
   type SourceDocument,
 } from '@/lib/api';
+import { SyncDiagnostics } from './sync-diagnostics';
+
+const documentsPerPage = 20;
 
 const tabs = [
   'Todos',
@@ -17,24 +18,22 @@ const tabs = [
 
 const futureFilters = ['Orgao', 'Licenca', 'Prazo', 'Responsavel'];
 
-export default async function Home() {
-  const data = await getDashboardData();
+export default async function Home({
+  searchParams,
+}: {
+  searchParams?: Promise<{ docPage?: string }>;
+}) {
+  const resolvedSearchParams = await searchParams;
+  const currentPage = getCurrentPage(resolvedSearchParams?.docPage);
+  const data = await getDashboardData(currentPage);
   const activeSource = data.sources[0];
-  const metrics = getMetrics(data.documents);
-
-  async function syncNow(formData: FormData) {
-    'use server';
-
-    const connectedSourceId = String(formData.get('connectedSourceId') ?? '');
-
-    try {
-      await runGoogleDriveSync({
-        connectedSourceId: connectedSourceId || undefined,
-      });
-    } finally {
-      revalidatePath('/');
-    }
-  }
+  const metrics = data.metrics;
+  const totalPages = Math.max(1, Math.ceil(metrics.total / documentsPerPage));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const firstDocument = metrics.total === 0
+    ? 0
+    : (safeCurrentPage - 1) * documentsPerPage + 1;
+  const lastDocument = Math.min(safeCurrentPage * documentsPerPage, metrics.total);
 
   return (
     <main className="workspace-shell">
@@ -93,55 +92,7 @@ export default async function Home() {
               <span>Buscar</span>
               <input placeholder="Nome, licenca, processo ou pasta" />
             </label>
-            <form action={syncNow}>
-              <input
-                name="connectedSourceId"
-                type="hidden"
-                value={activeSource?.id ?? ''}
-              />
-              <button
-                aria-label="Sincronizar agora"
-                className="sync-button"
-                title="Sincronizar agora"
-                type="submit"
-              >
-                <svg
-                  aria-hidden="true"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M20 6v5h-5"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2.4"
-                  />
-                  <path
-                    d="M4 18v-5h5"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2.4"
-                  />
-                  <path
-                    d="M19 11a7 7 0 0 0-12.1-4.8L4 9"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2.4"
-                  />
-                  <path
-                    d="M5 13a7 7 0 0 0 12.1 4.8L20 15"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2.4"
-                  />
-                </svg>
-              </button>
-            </form>
+            <SyncDiagnostics connectedSourceId={activeSource?.id} />
           </div>
         </header>
 
@@ -207,10 +158,86 @@ export default async function Home() {
                 )}
               </div>
             </div>
+
+            <Pagination
+              currentPage={safeCurrentPage}
+              firstDocument={firstDocument}
+              lastDocument={lastDocument}
+              totalDocuments={metrics.total}
+              totalPages={totalPages}
+            />
           </div>
         </section>
       </section>
     </main>
+  );
+}
+
+function Pagination({
+  currentPage,
+  firstDocument,
+  lastDocument,
+  totalDocuments,
+  totalPages,
+}: {
+  currentPage: number;
+  firstDocument: number;
+  lastDocument: number;
+  totalDocuments: number;
+  totalPages: number;
+}) {
+  const pages = getVisiblePages(currentPage, totalPages);
+
+  return (
+    <nav className="pagination" aria-label="Paginacao de documentos">
+      <span>
+        {totalDocuments === 0
+          ? 'Nenhum documento'
+          : `${firstDocument}-${lastDocument} de ${totalDocuments} documentos`}
+      </span>
+      <div className="pagination-actions">
+        <PaginationLink
+          disabled={currentPage <= 1}
+          href={getPageHref(currentPage - 1)}
+          label="Anterior"
+        />
+        {pages.map((page) => (
+          <PaginationLink
+            active={page === currentPage}
+            href={getPageHref(page)}
+            key={page}
+            label={String(page)}
+          />
+        ))}
+        <PaginationLink
+          disabled={currentPage >= totalPages}
+          href={getPageHref(currentPage + 1)}
+          label="Proxima"
+        />
+      </div>
+    </nav>
+  );
+}
+
+function PaginationLink({
+  active = false,
+  disabled = false,
+  href,
+  label,
+}: {
+  active?: boolean;
+  disabled?: boolean;
+  href: string;
+  label: string;
+}) {
+  if (disabled) {
+    return <span className="pagination-link disabled">{label}</span>;
+  }
+
+  return (
+    <a className={active ? 'pagination-link active' : 'pagination-link'} href={href}>
+      {label}
+    </a>
   );
 }
 
@@ -291,37 +318,6 @@ function Badge({ value }: { value: string }) {
   return <span className={`badge ${normalized}`}>{value.replaceAll('_', ' ')}</span>;
 }
 
-function getMetrics(documents: SourceDocument[]) {
-  return documents.reduce(
-    (metrics, document) => {
-      if (['IMPORTED', 'EXTRACTED', 'LINKED', 'VALIDATION_PENDING'].includes(document.importStatus)) {
-        metrics.imported += 1;
-      }
-      if (document.latestVersion?.hasExtractedText) {
-        metrics.extracted += 1;
-      }
-      if (document.importStatus === 'VALIDATION_PENDING') {
-        metrics.pending += 1;
-      }
-      if (document.importStatus === 'FAILED') {
-        metrics.failed += 1;
-      }
-      if (document.importStatus === 'LINKED') {
-        metrics.linked += 1;
-      }
-
-      return metrics;
-    },
-    {
-      imported: 0,
-      extracted: 0,
-      pending: 0,
-      failed: 0,
-      linked: 0,
-    },
-  );
-}
-
 function getFileType(document: SourceDocument) {
   if (document.mimeType?.includes('spreadsheet') || document.fileExtension === 'xlsx') {
     return 'Planilha';
@@ -350,4 +346,29 @@ function formatDateTime(value?: string | null) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(value));
+}
+
+function getCurrentPage(value?: string) {
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return 1;
+  }
+
+  return parsed;
+}
+
+function getPageHref(page: number) {
+  return `/?docPage=${Math.max(1, page)}`;
+}
+
+function getVisiblePages(currentPage: number, totalPages: number) {
+  const start = Math.max(1, currentPage - 2);
+  const end = Math.min(totalPages, start + 4);
+  const adjustedStart = Math.max(1, end - 4);
+
+  return Array.from(
+    { length: end - adjustedStart + 1 },
+    (_, index) => adjustedStart + index,
+  );
 }

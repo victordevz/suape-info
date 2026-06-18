@@ -67,6 +67,27 @@ type DocumentResponseRecord = SourceDocument & {
   documentMetadata?: DocumentMetadata | null;
   documentVersions?: DocumentVersion[];
 };
+type GoogleDriveSyncFolderScan = {
+  monitoredFolderId: string;
+  driveFolderId: string;
+  folderName: string;
+  folderPath: string | null;
+  itemsReturned: number;
+};
+type GoogleDriveSyncItemRead = {
+  driveFileId: string;
+  name: string;
+  mimeType: string;
+  itemType: 'folder' | 'file';
+  parentFolderId: string;
+  parentFolderPath: string | null;
+  webViewLink?: string;
+  modifiedTime?: string;
+};
+type GoogleDriveSyncDiagnostics = {
+  scannedFolders: GoogleDriveSyncFolderScan[];
+  driveItemsRead: GoogleDriveSyncItemRead[];
+};
 
 @Injectable()
 export class GoogleDriveIngestionService {
@@ -322,6 +343,8 @@ export class GoogleDriveIngestionService {
       documentsDetected: 0,
       jobsCreated: 0,
       errors: [] as Array<{ folderId: string; message: string }>,
+      scannedFolders: [] as GoogleDriveSyncFolderScan[],
+      driveItemsRead: [] as GoogleDriveSyncItemRead[],
     };
     const visitedFolderIds = new Set<string>();
 
@@ -331,6 +354,7 @@ export class GoogleDriveIngestionService {
           correlationId: randomUUID(),
           folder,
           visitedFolderIds,
+          diagnostics: result,
         });
         result.foldersScanned += folderResult.foldersScanned;
         result.foldersDetected += folderResult.foldersDetected;
@@ -433,6 +457,7 @@ export class GoogleDriveIngestionService {
         correlationId: job.correlationId ?? randomUUID(),
         folder: job.monitoredFolder,
         visitedFolderIds: new Set<string>(),
+        diagnostics: { scannedFolders: [], driveItemsRead: [] },
       });
 
       return this.getJob(jobId);
@@ -476,9 +501,73 @@ export class GoogleDriveIngestionService {
       },
       orderBy: { updatedAt: 'desc' },
       take: this.getTake(query.take),
+      skip: this.getSkip(query.skip),
     });
 
     return documents.map((document) => this.toDocumentResponse(document));
+  }
+
+  async getDocumentStats(rawQuery: unknown) {
+    const query = asRecord(rawQuery);
+    const connectedSourceId = optionalUuid(
+      query.connectedSourceId,
+      'connectedSourceId',
+    );
+    const where = {
+      connectedSourceId,
+    } satisfies Prisma.SourceDocumentWhereInput;
+
+    const [total, imported, extracted, pending, failed, linked] = await Promise.all([
+      this.prisma.sourceDocument.count({ where }),
+      this.prisma.sourceDocument.count({
+        where: {
+          ...where,
+          importStatus: {
+            in: [
+              SourceDocumentImportStatus.IMPORTED,
+              SourceDocumentImportStatus.EXTRACTED,
+              SourceDocumentImportStatus.LINKED,
+              SourceDocumentImportStatus.VALIDATION_PENDING,
+            ],
+          },
+        },
+      }),
+      this.prisma.sourceDocument.count({
+        where: {
+          ...where,
+          documentVersions: {
+            some: { extractionStatus: ExtractionStatus.SUCCESS },
+          },
+        },
+      }),
+      this.prisma.sourceDocument.count({
+        where: {
+          ...where,
+          importStatus: SourceDocumentImportStatus.VALIDATION_PENDING,
+        },
+      }),
+      this.prisma.sourceDocument.count({
+        where: {
+          ...where,
+          importStatus: SourceDocumentImportStatus.FAILED,
+        },
+      }),
+      this.prisma.sourceDocument.count({
+        where: {
+          ...where,
+          importStatus: SourceDocumentImportStatus.LINKED,
+        },
+      }),
+    ]);
+
+    return {
+      total,
+      imported,
+      extracted,
+      pending,
+      failed,
+      linked,
+    };
   }
 
   async getDocument(id: string) {
@@ -683,9 +772,10 @@ export class GoogleDriveIngestionService {
       correlationId: string;
       folder: MonitoredFolderWithSource;
       visitedFolderIds: Set<string>;
+      diagnostics: GoogleDriveSyncDiagnostics;
     },
   ) {
-    const { correlationId, folder, visitedFolderIds } = input;
+    const { correlationId, folder, visitedFolderIds, diagnostics } = input;
 
     if (visitedFolderIds.has(folder.driveFolderId)) {
       return {
@@ -697,6 +787,14 @@ export class GoogleDriveIngestionService {
     }
 
     visitedFolderIds.add(folder.driveFolderId);
+    const folderScan: GoogleDriveSyncFolderScan = {
+      monitoredFolderId: folder.id,
+      driveFolderId: folder.driveFolderId,
+      folderName: folder.folderName,
+      folderPath: folder.folderPath,
+      itemsReturned: 0,
+    };
+    diagnostics.scannedFolders.push(folderScan);
 
     const scanJob = await this.prisma.importJob.create({
       data: {
@@ -730,8 +828,12 @@ export class GoogleDriveIngestionService {
           folderId: folder.driveFolderId,
           pageToken,
         });
+        const pageFiles = page.files ?? [];
+        folderScan.itemsReturned += pageFiles.length;
 
-        for (const file of page.files ?? []) {
+        for (const file of pageFiles) {
+          this.recordDriveItemRead(diagnostics, folder, file);
+
           if (file.mimeType === GOOGLE_DRIVE_FOLDER_MIME_TYPE) {
             const detectedFolder = await this.upsertDetectedFolder({
               file,
@@ -741,6 +843,7 @@ export class GoogleDriveIngestionService {
               correlationId,
               folder: detectedFolder,
               visitedFolderIds,
+              diagnostics,
             });
 
             result.foldersScanned += childResult.foldersScanned;
@@ -841,6 +944,24 @@ export class GoogleDriveIngestionService {
     });
 
     return folder;
+  }
+
+  private recordDriveItemRead(
+    diagnostics: GoogleDriveSyncDiagnostics,
+    folder: MonitoredFolderWithSource,
+    file: GoogleDriveFile,
+  ) {
+    diagnostics.driveItemsRead.push({
+      driveFileId: file.id,
+      name: file.name,
+      mimeType: file.mimeType,
+      itemType:
+        file.mimeType === GOOGLE_DRIVE_FOLDER_MIME_TYPE ? 'folder' : 'file',
+      parentFolderId: folder.driveFolderId,
+      parentFolderPath: folder.folderPath,
+      webViewLink: file.webViewLink,
+      modifiedTime: file.modifiedTime,
+    });
   }
 
   private async upsertDetectedFile(input: {
@@ -1172,6 +1293,16 @@ export class GoogleDriveIngestionService {
 
     if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100) {
       throw new BadRequestException('take deve ser inteiro entre 1 e 100.');
+    }
+
+    return parsed;
+  }
+
+  private getSkip(value: unknown) {
+    const parsed = optionalNumber(value, 'skip') ?? 0;
+
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      throw new BadRequestException('skip deve ser inteiro maior ou igual a 0.');
     }
 
     return parsed;
