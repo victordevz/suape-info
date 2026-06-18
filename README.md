@@ -73,6 +73,7 @@ Documentacao util:
 - [Dicionario do banco](docs/database-dictionary.md)
 - [Prontidao ANPD/LGPD](docs/anpd-lgpd-readiness.md)
 - [Credenciais Google Drive](docs/google-drive-credentials.md)
+- [Arquitetura IA/RAG](docs/ai-agent-rag-architecture.md)
 
 ## Modulos iniciais
 
@@ -83,7 +84,7 @@ Documentacao util:
 - `deadlines`: prazos, recorrencias e vencimentos.
 - `access`: usuarios, papeis, permissoes e confidencialidade.
 - `ingestion`: integracao Google Drive por OAuth, pastas monitoradas, sincronizacao manual, jobs de importacao e documentos detectados.
-- `ai-gateway`: contrato futuro para microservico de IA/RAG.
+- `ai-gateway`: contratos iniciais para RAG sobre Drive importado, micro-agentes de leitura documental e triagem de licencas.
 
 ## Escopo desta etapa
 
