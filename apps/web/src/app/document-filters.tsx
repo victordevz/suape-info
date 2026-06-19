@@ -1,6 +1,7 @@
 'use client';
 
 import type { DashboardFilters, MonitoredFolder } from '@/lib/api';
+import Link from 'next/link';
 import { useRef } from 'react';
 
 type StatusOption = {
@@ -58,9 +59,9 @@ export function DocumentFilters({
         Aplicar filtros
       </button>
       {hasActiveFilters(filters) ? (
-        <a className="filter-clear" href="/">
+        <Link className="filter-clear" href="/">
           Limpar
-        </a>
+        </Link>
       ) : null}
     </form>
   );

@@ -3,6 +3,7 @@ import {
   getDashboardData,
   type SourceDocument,
 } from '@/lib/api';
+import Link from 'next/link';
 import { DebouncedDocumentSearch } from './debounced-document-search';
 import { DashboardShell } from './dashboard-shell';
 import { DocumentFilters } from './document-filters';
@@ -91,13 +92,13 @@ export default async function Home({
 
             <nav className="tabs" aria-label="Filtros por tipo de documento">
               {documentTypeTags.map((tag) => (
-                <a
+                <Link
                   className={filters.fileType === tag.fileType ? 'active' : ''}
                   href={getFilterHref(filters, { fileType: tag.fileType })}
                   key={tag.label}
                 >
                   {tag.label}
-                </a>
+                </Link>
               ))}
             </nav>
 
@@ -212,9 +213,9 @@ function PaginationLink({
   }
 
   return (
-    <a className={active ? 'pagination-link active' : 'pagination-link'} href={href}>
+    <Link className={active ? 'pagination-link active' : 'pagination-link'} href={href}>
       {label}
-    </a>
+    </Link>
   );
 }
 
