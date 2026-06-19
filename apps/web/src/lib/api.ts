@@ -1,10 +1,7 @@
 import {
   getMockAuditEvents,
-  getMockDashboardData,
   getMockLicenseTriageSheet,
   isMockModeEnabled,
-  removeMockMonitoredFolder,
-  runMockGoogleDriveSync,
 } from './mock-data';
 
 export type ConnectedSource = {
@@ -324,10 +321,6 @@ export async function getDashboardData(
   page = 1,
   filters: DashboardFilters = {},
 ): Promise<DashboardData> {
-  if (MOCK_MODE) {
-    return getMockDashboardData(page, filters);
-  }
-
   try {
     const documentPage = Math.max(1, Math.floor(page));
     const documentTake = 20;
@@ -433,10 +426,6 @@ export async function runGoogleDriveSync(input?: {
   connectedSourceId?: string;
   monitoredFolderId?: string;
 }) {
-  if (MOCK_MODE) {
-    return runMockGoogleDriveSync();
-  }
-
   const response = await fetch(`${getBrowserSafeApiUrl()}/sync/google-drive/run`, {
     method: 'POST',
     cache: 'no-store',
@@ -458,10 +447,6 @@ export async function runGoogleDriveSync(input?: {
 }
 
 export async function removeMonitoredFolder(id: string) {
-  if (MOCK_MODE) {
-    return removeMockMonitoredFolder(id);
-  }
-
   const response = await fetch(`${getBrowserSafeApiUrl()}/monitored-folders/${id}`, {
     method: 'DELETE',
     cache: 'no-store',
