@@ -63,6 +63,9 @@ const tagOrder: TagFilter[] = [
   { label: 'CPRH', value: 'CPRH' },
   { label: 'IBAMA', value: 'IBAMA' },
   { label: 'ANTAQ', value: 'ANTAQ' },
+  { label: 'APAC', value: 'APAC' },
+  { label: 'ANVISA', value: 'ANVISA' },
+  { label: 'SEMAS', value: 'SEMAS' },
 ];
 
 export default async function LicenseTriagePage({

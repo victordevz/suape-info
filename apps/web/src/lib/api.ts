@@ -2,6 +2,7 @@ import {
   getMockAuditEvents,
   getMockDashboardData,
   getMockLicenseTriageSheet,
+  getMockOverviewDriveDocuments,
   isMockModeEnabled,
   removeMockMonitoredFolder,
   runMockGoogleDriveSync,
@@ -398,6 +399,10 @@ export async function getDashboardData(
 }
 
 export async function getOverviewDriveDocuments(take = 40) {
+  if (MOCK_MODE) {
+    return getMockOverviewDriveDocuments(take);
+  }
+
   try {
     return await fetchJson<SourceDocument[]>(`/documents?take=${take}`, {
       revalidate: DRIVE_READ_REVALIDATE_SECONDS,
