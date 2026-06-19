@@ -1,34 +1,53 @@
 import {
+  type DashboardFilters,
   getDashboardData,
   type SourceDocument,
 } from '@/lib/api';
+import { DebouncedDocumentSearch } from './debounced-document-search';
+import { DashboardShell } from './dashboard-shell';
+import { DocumentFilters } from './document-filters';
 import { RemoveFolderButton } from './remove-folder-button';
 import { SyncDiagnostics } from './sync-diagnostics';
 
 const documentsPerPage = 20;
 
-const tabs = [
-  'Todos',
-  'Importados',
-  'Extraidos',
-  'Nao classificados',
-  'Aguardando validacao',
-  'Vinculados',
-  'Com erro',
+const documentTypeTags: Array<{
+  label: string;
+  fileType?: DashboardFilters['fileType'];
+}> = [
+  { label: 'Condicionantes' },
+  { label: 'PDFs', fileType: 'PDF' },
+  { label: 'Planilhas', fileType: 'SPREADSHEET' },
 ];
 
-const futureFilters = ['Orgao', 'Licenca', 'Prazo', 'Responsavel'];
+const statusOptions = [
+  { label: 'Todos os status', value: '' },
+  { label: 'Importados', value: 'IMPORTED' },
+  { label: 'Extraídos', value: 'EXTRACTED' },
+  { label: 'Não classificados', value: 'CLASSIFICATION_PENDING' },
+  { label: 'Aguardando validação', value: 'VALIDATION_PENDING' },
+  { label: 'Vinculados', value: 'LINKED' },
+  { label: 'Com erro', value: 'FAILED' },
+];
 
 export default async function Home({
   searchParams,
 }: {
-  searchParams?: Promise<{ docPage?: string }>;
+  searchParams?: Promise<{
+    docPage?: string;
+    q?: string;
+    monitoredFolderId?: string;
+    importStatus?: string;
+    fileType?: string;
+  }>;
 }) {
   const resolvedSearchParams = await searchParams;
   const currentPage = getCurrentPage(resolvedSearchParams?.docPage);
-  const data = await getDashboardData(currentPage);
+  const filters = getDashboardFilters(resolvedSearchParams);
+  const data = await getDashboardData(currentPage, filters);
   const activeSource = data.sources[0];
   const metrics = data.metrics;
+  const visibleFolderCount = data.folders.length;
   const totalPages = Math.max(1, Math.ceil(metrics.total / documentsPerPage));
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const firstDocument = metrics.total === 0
@@ -37,102 +56,54 @@ export default async function Home({
   const lastDocument = Math.min(safeCurrentPage * documentsPerPage, metrics.total);
 
   return (
-    <main className="workspace-shell">
-      <aside className="sidebar">
-        <div className="brand-lockup">
-          <div className="brand-symbol" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
+    <DashboardShell
+      activeNav="documents"
+      subtitle="Documentos importados do Drive"
+    >
+        <header className="dashboard-page-heading documents-heading">
           <div>
-            <strong>SUAPE</strong>
-            <small>Governanca ambiental</small>
-          </div>
-        </div>
-
-        <section className="panel-section">
-          <div className="section-title">Fontes conectadas</div>
-          <SourceItem
-            name="Google Drive"
-            status={activeSource?.connectionStatus ?? 'PENDING_PERMISSION'}
-            detail={activeSource?.displayName ?? 'Aguardando conexao OAuth'}
-            active
-          />
-        </section>
-
-        <section className="panel-section folders-section">
-          <div className="section-title">Pastas conectadas</div>
-          {data.folders.length > 0 ? (
-            data.folders.map((folder) => (
-              <div className="folder-item" key={folder.id}>
-                <span className={folder.isActive ? 'dot active' : 'dot muted'} />
-                <span className="folder-copy">
-                  <strong>{folder.folderName}</strong>
-                  <small>{folder.folderPath ?? 'Caminho nao informado'}</small>
-                </span>
-                <RemoveFolderButton folderName={folder.folderName} id={folder.id} />
-              </div>
-            ))
-          ) : (
-            <div className="empty-card">
-              Nenhuma pasta monitorada. Conecte o Drive e selecione uma pasta.
-            </div>
-          )}
-        </section>
-      </aside>
-
-      <section className="content-area">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">Central de Dados e Evidencias</p>
             <h1>Documentos importados do Drive</h1>
+            <p>
+              Consulte arquivos sincronizados, status de importação e evidências
+              vindas das pastas monitoradas.
+            </p>
           </div>
-          <div className="topbar-actions">
-            <label className="search-box">
-              <span>Buscar</span>
-              <input placeholder="Nome, licenca, processo ou pasta" />
-            </label>
+          <div className="documents-heading-actions">
+            <DebouncedDocumentSearch initialValue={filters.q} />
             <SyncDiagnostics connectedSourceId={activeSource?.id} />
           </div>
         </header>
 
         <section className="metrics-grid" aria-label="Indicadores">
-          <MetricCard label="Pastas conectadas" value={data.folders.length} tone="blue" />
+          <MetricCard label="Pastas conectadas" value={visibleFolderCount} tone="blue" />
           <MetricCard label="Documentos importados" value={metrics.imported} tone="blue" />
-          <MetricCard label="Texto extraido" value={metrics.extracted} tone="green" />
-          <MetricCard label="Validacao pendente" value={metrics.pending} tone="yellow" />
+          <MetricCard label="Texto extraído" value={metrics.extracted} tone="green" />
+          <MetricCard label="Validação pendente" value={metrics.pending} tone="yellow" />
           <MetricCard label="Erros" value={metrics.failed} tone="red" />
           <MetricCard label="Vinculados" value={metrics.linked} tone="blue" />
         </section>
 
         <section className="document-workbench">
           <div className="table-panel">
-            <div className="breadcrumb">Google Drive / GML / Licencas e Autorizacoes</div>
+            <div className="breadcrumb">Google Drive / GML / Licenças e Autorizações</div>
 
-            <nav className="tabs" aria-label="Filtros por status">
-              {tabs.map((tab, index) => (
-                <button className={index === 0 ? 'active' : ''} key={tab}>
-                  {tab}
-                </button>
+            <nav className="tabs" aria-label="Filtros por tipo de documento">
+              {documentTypeTags.map((tag) => (
+                <a
+                  className={filters.fileType === tag.fileType ? 'active' : ''}
+                  href={getFilterHref(filters, { fileType: tag.fileType })}
+                  key={tag.label}
+                >
+                  {tag.label}
+                </a>
               ))}
             </nav>
 
-            <div className="filter-row">
-              <input placeholder="q: buscar por nome" />
-              <select defaultValue="">
-                <option value="">Pasta monitorada</option>
-              </select>
-              <select defaultValue="">
-                <option value="">Status de importacao</option>
-              </select>
-              {futureFilters.map((filter) => (
-                <button className="future-filter" disabled key={filter}>
-                  {filter} futuro
-                </button>
-              ))}
-            </div>
+            <DocumentFilters
+              filters={filters}
+              folders={data.folders}
+              statusOptions={statusOptions}
+            />
 
             <div className="table-scroll" aria-label="Tabela de documentos importados">
               <div className="documents-table" role="table">
@@ -141,9 +112,9 @@ export default async function Home({
                   <span>Tipo</span>
                   <span>Origem</span>
                   <span>Status</span>
-                  <span>Extracao</span>
-                  <span>Ultima sync</span>
-                  <span>Acao</span>
+                  <span>Extração</span>
+                  <span>Última sync</span>
+                  <span>Ação</span>
                 </div>
 
                 {data.documents.length > 0 ? (
@@ -154,7 +125,7 @@ export default async function Home({
                   <div className="empty-state">
                     <strong>Nenhum documento importado ainda.</strong>
                     <span>
-                      Execute uma sincronizacao depois de cadastrar uma pasta monitorada.
+                      Execute uma sincronização depois de cadastrar uma pasta monitorada.
                     </span>
                   </div>
                 )}
@@ -167,22 +138,24 @@ export default async function Home({
               lastDocument={lastDocument}
               totalDocuments={metrics.total}
               totalPages={totalPages}
+              filters={filters}
             />
           </div>
         </section>
-      </section>
-    </main>
+    </DashboardShell>
   );
 }
 
 function Pagination({
   currentPage,
+  filters,
   firstDocument,
   lastDocument,
   totalDocuments,
   totalPages,
 }: {
   currentPage: number;
+  filters: DashboardFilters;
   firstDocument: number;
   lastDocument: number;
   totalDocuments: number;
@@ -191,7 +164,7 @@ function Pagination({
   const pages = getVisiblePages(currentPage, totalPages);
 
   return (
-    <nav className="pagination" aria-label="Paginacao de documentos">
+    <nav className="pagination" aria-label="Paginação de documentos">
       <span>
         {totalDocuments === 0
           ? 'Nenhum documento'
@@ -200,21 +173,21 @@ function Pagination({
       <div className="pagination-actions">
         <PaginationLink
           disabled={currentPage <= 1}
-          href={getPageHref(currentPage - 1)}
+          href={getPageHref(currentPage - 1, filters)}
           label="Anterior"
         />
         {pages.map((page) => (
           <PaginationLink
             active={page === currentPage}
-            href={getPageHref(page)}
+            href={getPageHref(page, filters)}
             key={page}
             label={String(page)}
           />
         ))}
         <PaginationLink
           disabled={currentPage >= totalPages}
-          href={getPageHref(currentPage + 1)}
-          label="Proxima"
+          href={getPageHref(currentPage + 1, filters)}
+          label="Próxima"
         />
       </div>
     </nav>
@@ -240,28 +213,6 @@ function PaginationLink({
     <a className={active ? 'pagination-link active' : 'pagination-link'} href={href}>
       {label}
     </a>
-  );
-}
-
-function SourceItem({
-  name,
-  status,
-  detail,
-  active = false,
-}: {
-  name: string;
-  status: string;
-  detail: string;
-  active?: boolean;
-}) {
-  return (
-    <div className={active ? 'source-item active' : 'source-item'}>
-      <div>
-        <strong>{name}</strong>
-        <small>{detail}</small>
-      </div>
-      <Badge value={status} />
-    </div>
   );
 }
 
@@ -294,9 +245,9 @@ function DocumentRow({ document }: { document: SourceDocument }) {
       <span data-label="Status">
         <Badge value={document.importStatus} />
       </span>
-      <span data-label="Extracao">{document.latestVersion?.extractionStatus ?? 'PENDING'}</span>
-      <span data-label="Ultima sync">{formatDateTime(document.lastImportedAt)}</span>
-      <span data-label="Acao">
+      <span data-label="Extração">{document.latestVersion?.extractionStatus ?? 'PENDING'}</span>
+      <span data-label="Última sync">{formatDateTime(document.lastImportedAt)}</span>
+      <span data-label="Ação">
         {document.driveWebUrl ? (
           <a
             className="drive-link"
@@ -307,7 +258,7 @@ function DocumentRow({ document }: { document: SourceDocument }) {
             Abrir
           </a>
         ) : (
-          <span className="muted-text">Indisponivel</span>
+          <span className="muted-text">Indisponível</span>
         )}
       </span>
     </div>
@@ -360,8 +311,69 @@ function getCurrentPage(value?: string) {
   return parsed;
 }
 
-function getPageHref(page: number) {
-  return `/?docPage=${Math.max(1, page)}`;
+function getDashboardFilters(
+  searchParams?: {
+    q?: string;
+    monitoredFolderId?: string;
+    importStatus?: string;
+    fileType?: string;
+  },
+): DashboardFilters {
+  return {
+    q: getOptionalParam(searchParams?.q),
+    monitoredFolderId: getOptionalParam(searchParams?.monitoredFolderId),
+    importStatus: getAllowedParam(
+      searchParams?.importStatus,
+      statusOptions.map((option) => option.value).filter(Boolean),
+    ),
+    fileType: getAllowedParam(searchParams?.fileType, [
+      'PDF',
+      'SPREADSHEET',
+    ]) as DashboardFilters['fileType'],
+  };
+}
+
+function getOptionalParam(value?: string) {
+  const normalized = value?.trim();
+
+  return normalized || undefined;
+}
+
+function getAllowedParam(value: string | undefined, allowedValues: string[]) {
+  const normalized = getOptionalParam(value);
+
+  return normalized && allowedValues.includes(normalized)
+    ? normalized
+    : undefined;
+}
+
+function getFilterHref(
+  currentFilters: DashboardFilters,
+  nextFilters: Partial<DashboardFilters>,
+) {
+  return getHref({ ...currentFilters, ...nextFilters });
+}
+
+function getPageHref(page: number, filters: DashboardFilters) {
+  return getHref(filters, Math.max(1, page));
+}
+
+function getHref(filters: DashboardFilters, page?: number) {
+  const params = new URLSearchParams();
+
+  if (page && page > 1) {
+    params.set('docPage', String(page));
+  }
+
+  for (const [key, value] of Object.entries(filters)) {
+    if (value) {
+      params.set(key, value);
+    }
+  }
+
+  const query = params.toString();
+
+  return query ? `/?${query}` : '/';
 }
 
 function getVisiblePages(currentPage: number, totalPages: number) {

@@ -470,28 +470,9 @@ export class GoogleDriveIngestionService {
 
   async listDocuments(rawQuery: unknown) {
     const query = asRecord(rawQuery);
-    const connectedSourceId = optionalUuid(
-      query.connectedSourceId,
-      'connectedSourceId',
-    );
-    const monitoredFolderId = optionalUuid(
-      query.monitoredFolderId,
-      'monitoredFolderId',
-    );
-    const importStatus = optionalEnum(
-      query.importStatus ?? query.status,
-      'importStatus',
-      Object.values(SourceDocumentImportStatus),
-    );
-    const q = optionalString(query.q, 'q');
+    const where = this.getDocumentWhere(query);
     const documents = await this.prisma.sourceDocument.findMany({
-      where: {
-        connectedSourceId,
-        monitoredFolderId,
-        monitoredFolder: monitoredFolderId ? undefined : { isActive: true },
-        importStatus,
-        fileName: q ? { contains: q, mode: 'insensitive' } : undefined,
-      },
+      where,
       include: {
         documentMetadata: true,
         documentVersions: {
@@ -510,14 +491,7 @@ export class GoogleDriveIngestionService {
 
   async getDocumentStats(rawQuery: unknown) {
     const query = asRecord(rawQuery);
-    const connectedSourceId = optionalUuid(
-      query.connectedSourceId,
-      'connectedSourceId',
-    );
-    const where = {
-      connectedSourceId,
-      monitoredFolder: { isActive: true },
-    } satisfies Prisma.SourceDocumentWhereInput;
+    const where = this.getDocumentWhere(query);
 
     const [total, imported, extracted, pending, failed, linked] = await Promise.all([
       this.prisma.sourceDocument.count({ where }),
@@ -570,6 +544,59 @@ export class GoogleDriveIngestionService {
       failed,
       linked,
     };
+  }
+
+  private getDocumentWhere(
+    query: Record<string, unknown>,
+  ): Prisma.SourceDocumentWhereInput {
+    const connectedSourceId = optionalUuid(
+      query.connectedSourceId,
+      'connectedSourceId',
+    );
+    const monitoredFolderId = optionalUuid(
+      query.monitoredFolderId,
+      'monitoredFolderId',
+    );
+    const importStatus = optionalEnum(
+      query.importStatus ?? query.status,
+      'importStatus',
+      Object.values(SourceDocumentImportStatus),
+    );
+    const q = optionalString(query.q, 'q');
+    const fileType = optionalEnum(query.fileType, 'fileType', [
+      'PDF',
+      'SPREADSHEET',
+    ]);
+    const where = {
+      connectedSourceId,
+      monitoredFolderId,
+      monitoredFolder: monitoredFolderId ? undefined : { isActive: true },
+      importStatus,
+      fileName: q ? { contains: q, mode: 'insensitive' } : undefined,
+    } satisfies Prisma.SourceDocumentWhereInput;
+
+    if (fileType === 'PDF') {
+      return {
+        ...where,
+        OR: [
+          { mimeType: 'application/pdf' },
+          { fileExtension: { equals: 'pdf', mode: 'insensitive' } },
+        ],
+      };
+    }
+
+    if (fileType === 'SPREADSHEET') {
+      return {
+        ...where,
+        OR: [
+          { mimeType: { contains: 'spreadsheet', mode: 'insensitive' } },
+          { mimeType: { contains: 'excel', mode: 'insensitive' } },
+          { fileExtension: { in: ['xls', 'xlsx', 'csv', 'ods'] } },
+        ],
+      };
+    }
+
+    return where;
   }
 
   async getDocument(id: string) {
