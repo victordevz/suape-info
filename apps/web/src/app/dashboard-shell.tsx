@@ -28,6 +28,8 @@ export function DashboardShell({
   activeNav,
   children,
 }: DashboardShellProps) {
+  const isMockMode = process.env.NEXT_PUBLIC_MOCK_MODE !== 'false';
+
   return (
     <main className="dashboard-shell">
       <aside className="dashboard-sidebar" aria-label="Navegação do dashboard">
@@ -36,6 +38,7 @@ export function DashboardShell({
           <span>
             <strong>Central de Dados e Evidências</strong>
             <small>Governança documental</small>
+            {isMockMode ? <small>Modo demo ativo</small> : null}
           </span>
         </Link>
 

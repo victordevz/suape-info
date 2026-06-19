@@ -1,3 +1,12 @@
+import {
+  getMockAuditEvents,
+  getMockDashboardData,
+  getMockLicenseTriageSheet,
+  isMockModeEnabled,
+  removeMockMonitoredFolder,
+  runMockGoogleDriveSync,
+} from './mock-data';
+
 export type ConnectedSource = {
   id: string;
   provider: string;
@@ -290,6 +299,7 @@ export type LicenseTriageSheetResult = {
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api';
+const MOCK_MODE = isMockModeEnabled();
 
 function getBrowserSafeApiUrl() {
   return typeof window === 'undefined' ? API_URL : '/backend';
@@ -314,6 +324,10 @@ export async function getDashboardData(
   page = 1,
   filters: DashboardFilters = {},
 ): Promise<DashboardData> {
+  if (MOCK_MODE) {
+    return getMockDashboardData(page, filters);
+  }
+
   try {
     const documentPage = Math.max(1, Math.floor(page));
     const documentTake = 20;
@@ -372,6 +386,10 @@ export async function getLicenseTriageSheet(input: {
   licenseId?: string;
   take?: number;
 } = {}) {
+  if (MOCK_MODE) {
+    return getMockLicenseTriageSheet();
+  }
+
   const query = getDocumentQuery({
     spreadsheetId: input.spreadsheetId ?? 'planilha-controle-licencas-gml-2026',
     sourceRecordId: input.sourceRecordId,
@@ -386,6 +404,10 @@ export async function getLicenseTriageSheet(input: {
 }
 
 export async function getAuditEvents(take = 8) {
+  if (MOCK_MODE) {
+    return getMockAuditEvents(take);
+  }
+
   const query = getDocumentQuery({ take: String(take) });
 
   return fetchJson<AuditEvent[]>(`/audit-events${query}`);
@@ -411,6 +433,10 @@ export async function runGoogleDriveSync(input?: {
   connectedSourceId?: string;
   monitoredFolderId?: string;
 }) {
+  if (MOCK_MODE) {
+    return runMockGoogleDriveSync();
+  }
+
   const response = await fetch(`${getBrowserSafeApiUrl()}/sync/google-drive/run`, {
     method: 'POST',
     cache: 'no-store',
@@ -432,6 +458,10 @@ export async function runGoogleDriveSync(input?: {
 }
 
 export async function removeMonitoredFolder(id: string) {
+  if (MOCK_MODE) {
+    return removeMockMonitoredFolder(id);
+  }
+
   const response = await fetch(`${getBrowserSafeApiUrl()}/monitored-folders/${id}`, {
     method: 'DELETE',
     cache: 'no-store',
