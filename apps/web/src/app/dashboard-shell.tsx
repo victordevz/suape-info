@@ -34,7 +34,9 @@ export function DashboardShell({
     <main className="dashboard-shell">
       <aside className="dashboard-sidebar" aria-label="Navegação do dashboard">
         <Link className="dashboard-brand sidebar-brand" href="/dashboard">
-          <span className="dashboard-brand-symbol">S</span>
+          <span className="dashboard-brand-symbol" aria-hidden="true">
+            <img src="/suape-logo.png" alt="" />
+          </span>
           <span>
             <strong>Central de Dados e Evidências</strong>
             <small>Governança documental</small>
