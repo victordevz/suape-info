@@ -470,8 +470,6 @@ function getOverviewMetrics(input: {
         ? `${nearestLicense.licenseNumber} - ${formatDate(nearestLicense.expiresAt)}`
         : 'Nenhuma validade recebida',
       tone: 'blue',
-      badge: nearestLicense ? formatDaysUntil(nearestLicense.expiresAt) : 'Sem prazo',
-      helperTone: 'green',
       icon: 'calendar',
     },
     {
