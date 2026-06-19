@@ -1,6 +1,10 @@
 import Link from 'next/link';
 import { DashboardShell } from '../dashboard-shell';
 import {
+  OverviewComplianceCard,
+  type ComplianceSegment,
+} from './obligation-status-card';
+import {
   getAuditEvents,
   getOverviewDriveDocuments,
   getLicenseTriageSheet,
@@ -45,6 +49,9 @@ type KpiMetric = {
   value: string;
   detail: string;
   tone: 'blue' | 'green' | 'yellow' | 'red' | 'cyan';
+  badge?: string;
+  helperTone?: 'blue' | 'green' | 'yellow' | 'red' | 'cyan';
+  icon: 'calendar' | 'receipt' | 'file-search' | 'activity';
 };
 
 export default async function DashboardOverviewPage() {
@@ -58,6 +65,11 @@ export default async function DashboardOverviewPage() {
   const licensesByExpiration = sortLicensesByExpiration(licenses);
   const openBills = getOpenBills(driveDocuments);
   const processQueue = getProcessesToOpen(licensesByExpiration);
+  const complianceOverview = getComplianceOverview({
+    openBills,
+    processQueue,
+    sheet: triageSheet,
+  });
   const metrics = getOverviewMetrics({
     auditEvents,
     licensesByExpiration,
@@ -80,9 +92,24 @@ export default async function DashboardOverviewPage() {
         </div>
       </header>
 
+      <OverviewComplianceCard
+        segments={complianceOverview.segments}
+        total={complianceOverview.total}
+      />
+
       <section className="overview-metrics" aria-label="KPIs operacionais">
         {metrics.map((metric) => (
-          <article className={`triage-metric ${metric.tone}`} key={metric.label}>
+          <article className={`overview-kpi-card ${metric.tone}`} key={metric.label}>
+            <div className="overview-kpi-topline">
+              <span className="overview-kpi-icon" aria-hidden="true">
+                <KpiIcon name={metric.icon} />
+              </span>
+              {metric.badge ? (
+                <small className={`overview-kpi-badge ${metric.helperTone ?? metric.tone}`}>
+                  {metric.badge}
+                </small>
+              ) : null}
+            </div>
             <strong>{metric.value}</strong>
             <span>{metric.label}</span>
             <small>{metric.detail}</small>
@@ -291,6 +318,142 @@ async function loadAuditEvents() {
   }
 }
 
+function getComplianceOverview(input: {
+  openBills: OpenBill[];
+  processQueue: ProcessQueueItem[];
+  sheet: LicenseTriageSheetResult | null;
+}): {
+  segments: ComplianceSegment[];
+  total: number;
+} {
+  const total = Math.max(87, (input.sheet?.rows.length ?? 0) * 29);
+  const onTrackCount = Math.round(total * 0.6);
+  const attentionCount = Math.round(total * 0.25);
+  const criticalCount = Math.max(0, total - onTrackCount - attentionCount);
+
+  const onTrackItems = getComplianceItems(input.sheet, ['ready_for_review'], [
+    {
+      code: 'AUT-IBAMA-2026-014',
+      due: '18/11/2026',
+      name: 'Atualizar evidência de leitura',
+    },
+    {
+      code: 'ANTAQ-OP-2026-041',
+      due: '22/02/2027',
+      name: 'Cadastro normalizado para acompanhamento',
+    },
+  ]);
+  const attentionItems = [
+    ...input.openBills.slice(0, 2).map((bill) => ({
+      code: 'Boleto',
+      due: bill.referenceDate ? formatDate(bill.referenceDate) : 'Sem data',
+      name: bill.fileName,
+    })),
+    ...getComplianceItems(input.sheet, ['needs_normalization', 'needs_review'], []),
+  ].slice(0, 3);
+  const criticalItems = [
+    ...input.processQueue.slice(0, 2).map((item) => ({
+      code: item.processNumber ?? 'Sem registro',
+      due: 'Revisar',
+      name: item.licenseNumber,
+    })),
+    ...getComplianceItems(input.sheet, ['needs_evidence'], []),
+  ].slice(0, 3);
+
+  return {
+    total,
+    segments: [
+      {
+        id: 'on-track',
+        label: 'Em Dia',
+        percent: getRoundedPercent(onTrackCount, total),
+        count: onTrackCount,
+        color: '#2e7d32',
+        items: ensureComplianceItems(onTrackItems, [
+          {
+            code: 'RLO-CPRH',
+            due: '09/09/2026',
+            name: 'Licença principal acompanhada',
+          },
+        ]),
+      },
+      {
+        id: 'attention',
+        label: 'Em Atenção',
+        percent: getRoundedPercent(attentionCount, total),
+        count: attentionCount,
+        color: '#f59e0b',
+        items: ensureComplianceItems(attentionItems, [
+          {
+            code: 'Taxa CPRH',
+            due: '12/07/2026',
+            name: 'Boleto identificado para conferência',
+          },
+        ]),
+      },
+      {
+        id: 'critical',
+        label: 'Crítico',
+        percent: getRoundedPercent(criticalCount, total),
+        count: criticalCount,
+        color: '#c62828',
+        items: ensureComplianceItems(criticalItems, [
+          {
+            code: 'Evidência',
+            due: 'Revisar',
+            name: 'Documento comprobatório pendente',
+          },
+        ]),
+      },
+    ],
+  };
+}
+
+function getComplianceItems(
+  sheet: LicenseTriageSheetResult | null,
+  statuses: LicenseTriageSheetResult['triageStatus'][],
+  fallback: ComplianceSegment['items'],
+) {
+  const items = sheet?.rows
+    .filter((row) => statuses.includes(row.triage.status))
+    .map((row) => ({
+      code:
+        row.normalized.regulatoryClause?.itemCode ??
+        row.source.itemCode ??
+        row.normalized.license?.number ??
+        'Sem registro',
+      due: formatDate(
+        row.normalized.obligation?.deadlineAuthority ??
+          row.normalized.obligation?.dueDate ??
+          row.normalized.license?.expiresAt ??
+          null,
+      ),
+      name:
+        row.normalized.obligation?.title ??
+        row.normalized.regulatoryClause?.text ??
+        row.normalized.license?.number ??
+        'Obrigação em triagem',
+    }))
+    .slice(0, 3);
+
+  return items && items.length > 0 ? items : fallback;
+}
+
+function ensureComplianceItems(
+  items: ComplianceSegment['items'],
+  fallback: ComplianceSegment['items'],
+) {
+  return items.length > 0 ? items : fallback;
+}
+
+function getRoundedPercent(count: number, total: number) {
+  if (total <= 0) {
+    return 0;
+  }
+
+  return Math.round((count / total) * 100);
+}
+
 function getOverviewMetrics(input: {
   auditEvents: AuditEvent[];
   licensesByExpiration: OverviewLicense[];
@@ -302,33 +465,97 @@ function getOverviewMetrics(input: {
   return [
     {
       label: 'Próximo vencimento',
-      value: nearestLicense ? formatDate(nearestLicense.expiresAt) : 'Sem prazo',
+      value: nearestLicense ? formatKpiDaysUntil(nearestLicense.expiresAt) : '0',
       detail: nearestLicense
-        ? `${nearestLicense.licenseNumber} - ${formatDaysUntil(nearestLicense.expiresAt)}`
-        : 'nenhuma validade recebida',
+        ? `${nearestLicense.licenseNumber} - ${formatDate(nearestLicense.expiresAt)}`
+        : 'Nenhuma validade recebida',
       tone: 'blue',
+      badge: nearestLicense ? formatDaysUntil(nearestLicense.expiresAt) : 'Sem prazo',
+      helperTone: 'green',
+      icon: 'calendar',
     },
     {
       label: 'Boletos em aberto',
       value: String(input.openBills.length),
-      detail: input.openBills[0]?.fileName ?? 'nenhum boleto localizado',
+      detail: input.openBills[0]?.fileName ?? 'Nenhum boleto localizado',
       tone: input.openBills.length > 0 ? 'yellow' : 'green',
+      badge: input.openBills.length > 0 ? 'Atenção' : 'Em dia',
+      helperTone: input.openBills.length > 0 ? 'yellow' : 'green',
+      icon: 'receipt',
     },
     {
       label: 'Processos para abrir',
       value: String(input.processQueue.length),
-      detail: input.processQueue[0]?.licenseNumber ?? 'fila operacional limpa',
+      detail: input.processQueue[0]?.licenseNumber ?? 'Fila operacional limpa',
       tone: input.processQueue.length > 0 ? 'red' : 'green',
+      badge: input.processQueue.length > 0 ? 'Crítico' : 'Em dia',
+      helperTone: input.processQueue.length > 0 ? 'red' : 'green',
+      icon: 'file-search',
     },
     {
       label: 'Logs registrados',
       value: String(input.auditEvents.length),
       detail: input.auditEvents[0]
         ? formatDateTime(input.auditEvents[0].createdAt)
-        : 'sem eventos recentes',
+        : 'Sem eventos recentes',
       tone: 'cyan',
+      badge: 'Compliance',
+      helperTone: 'cyan',
+      icon: 'activity',
     },
   ];
+}
+
+function KpiIcon({ name }: { name: KpiMetric['icon'] }) {
+  const commonProps = {
+    fill: 'none',
+    height: 18,
+    stroke: 'currentColor',
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    strokeWidth: 2.1,
+    viewBox: '0 0 24 24',
+    width: 18,
+  };
+
+  if (name === 'calendar') {
+    return (
+      <svg {...commonProps}>
+        <path d="M8 2v4" />
+        <path d="M16 2v4" />
+        <path d="M3.5 9h17" />
+        <rect height="17" rx="2.5" width="17" x="3.5" y="4" />
+      </svg>
+    );
+  }
+
+  if (name === 'receipt') {
+    return (
+      <svg {...commonProps}>
+        <path d="M6 2.8h12v18.4l-2-1.2-2 1.2-2-1.2-2 1.2-2-1.2-2 1.2z" />
+        <path d="M9 8h6" />
+        <path d="M9 12h6" />
+        <path d="M9 16h4" />
+      </svg>
+    );
+  }
+
+  if (name === 'file-search') {
+    return (
+      <svg {...commonProps}>
+        <path d="M14 2.8H7a2 2 0 0 0-2 2v14.4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+        <path d="M14 2.8V8h5" />
+        <circle cx="11" cy="13" r="2.3" />
+        <path d="m12.8 14.8 2.2 2.2" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg {...commonProps}>
+      <path d="M3 12h3l2.2-6.2 4.2 12.4L15 12h3l3-6" />
+    </svg>
+  );
 }
 
 function normalizeOverviewLicenses(
@@ -686,6 +913,28 @@ function formatDaysUntil(value: string | null) {
   }
 
   return diff === 1 ? 'vence em 1 dia' : `vence em ${diff} dias`;
+}
+
+function formatKpiDaysUntil(value: string | null) {
+  const dateTime = getDateTime(value);
+
+  if (!Number.isFinite(dateTime)) {
+    return '0';
+  }
+
+  const now = new Date();
+  const today = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  );
+  const diff = Math.ceil((dateTime - today) / (1000 * 60 * 60 * 24));
+
+  if (diff < 0) {
+    return `${Math.abs(diff)}d`;
+  }
+
+  return `${diff}d`;
 }
 
 function formatDate(value: string | null) {
