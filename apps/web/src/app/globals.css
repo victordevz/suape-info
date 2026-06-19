@@ -36,6 +36,7 @@
 
 html {
   min-height: 100%;
+  scroll-behavior: smooth;
   background:
     radial-gradient(circle at top right, rgba(252, 179, 22, 0.16), transparent 26rem),
     linear-gradient(135deg, #f7fbff 0%, #edf4fc 48%, #f9fbfe 100%);
@@ -1865,6 +1866,13 @@ select:focus {
 .triage-side-stack {
   display: grid;
   gap: 1.5rem;
+  scroll-margin-top: 1.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }
 
 .next-action-card {

@@ -169,7 +169,7 @@ export default async function LicenseTriagePage({
         </div>
 
         {selectedTriage ? (
-          <div className="triage-side-stack">
+          <div className="triage-side-stack" id="licenca-detalhes">
             <section className="next-action-card">
               <span>Registro</span>
               <strong>{selectedTriage.licenseNumber}</strong>
@@ -249,7 +249,7 @@ function LicenseRow({
   return (
     <Link
       className={isSelected ? 'license-table-row selected' : 'license-table-row'}
-      href={getLicenseHref(activeTag, triage.id)}
+      href={`${getLicenseHref(activeTag, triage.id)}#licenca-detalhes`}
       role="row"
     >
       <strong data-label="Licença">{triage.licenseNumber}</strong>
