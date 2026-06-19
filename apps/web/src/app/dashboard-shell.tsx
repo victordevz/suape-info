@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 type DashboardShellProps = {
-  activeNav: 'overview' | 'documents' | 'licenses';
+  activeNav: 'overview' | 'documents' | 'licenses' | 'compliance';
   children: React.ReactNode;
   subtitle?: string;
 };
@@ -14,7 +14,7 @@ const operationNav = [
     label: 'Licenças em triagem',
     href: '/dashboard/licencas/triagem',
   },
-  { key: 'evidence', label: 'Evidências anexadas' },
+  { key: 'compliance', label: 'Compliance', href: '/dashboard/compliance' },
   { key: 'pending', label: 'Pendências e conflitos' },
 ];
 
