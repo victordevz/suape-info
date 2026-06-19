@@ -96,6 +96,8 @@ const mockFolders: MonitoredFolder[] = [
   },
 ];
 
+mockFolders.push(...createAdditionalMockFolders(50 - mockFolders.length));
+
 const mockDocuments: SourceDocument[] = [
   {
     id: 'doc-licenca-rlo',
@@ -532,6 +534,8 @@ mockDocuments.push(
     modifiedAtSource: '2026-06-10T11:46:00.000Z',
   }),
 );
+
+mockDocuments.push(...createAdditionalMockDocuments(120 - mockDocuments.length));
 
 const mockJobs: ImportJob[] = [
   {
@@ -1437,6 +1441,113 @@ function asset(id: string, fileName: string, source: 'spreadsheet' | 'regulatory
     mimeType: 'application/pdf',
     source,
   };
+}
+
+function createAdditionalMockFolders(count: number): MonitoredFolder[] {
+  if (count <= 0) {
+    return [];
+  }
+
+  const folderGroups = [
+    ['licencas-operacionais', 'Licenças operacionais', '/Ambiental/Licenças/Operacionais'],
+    ['condicionantes-cprh', 'Condicionantes CPRH', '/Ambiental/Condicionantes/CPRH'],
+    ['condicionantes-ibama', 'Condicionantes IBAMA', '/Ambiental/Condicionantes/IBAMA'],
+    ['evidencias-campo', 'Evidências de campo', '/Ambiental/Evidências/Campo'],
+    ['relatorios-monitoramento', 'Relatórios de monitoramento', '/Ambiental/Relatórios/Monitoramento'],
+    ['geoespacial-kml-kmz', 'Camadas KML e KMZ', '/Ambiental/Geoespacial'],
+    ['boletos-guias', 'Boletos e guias', '/Ambiental/Financeiro/Guias'],
+    ['processos-sei', 'Processos SEI', '/Ambiental/Processos/SEI'],
+    ['outorgas-apac', 'Outorgas APAC', '/Ambiental/Outorgas/APAC'],
+    ['auditorias', 'Auditorias e fiscalizações', '/Ambiental/Auditorias'],
+  ];
+
+  return Array.from({ length: count }, (_, index) => {
+    const group = folderGroups[index % folderGroups.length];
+    const sequence = Math.floor(index / folderGroups.length) + 1;
+    const id = `folder-auto-${group[0]}-${sequence}`;
+
+    return {
+      id,
+      connectedSourceId: 'source-google-drive-demo',
+      driveFolderId: `drive-${id}`,
+      folderName: `${group[1]} ${String(sequence).padStart(2, '0')}`,
+      folderPath: `${group[2]}/${String(sequence).padStart(2, '0')}`,
+      parentFolderId: null,
+      isActive: true,
+      lastScanAt: `2026-06-${String(18 - (index % 8)).padStart(2, '0')}T${String(21 - (index % 6)).padStart(2, '0')}:30:00.000Z`,
+    };
+  });
+}
+
+function createAdditionalMockDocuments(count: number): SourceDocument[] {
+  if (count <= 0) {
+    return [];
+  }
+
+  const extensions = [
+    { extension: 'pdf', mimeType: 'application/pdf', type: 'Relatório técnico' },
+    {
+      extension: 'xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      type: 'Planilha de condicionantes',
+    },
+    { extension: 'kml', mimeType: 'application/vnd.google-earth.kml+xml', type: 'Camada geoespacial' },
+    { extension: 'kmz', mimeType: 'application/vnd.google-earth.kmz', type: 'Pacote geoespacial' },
+    { extension: 'docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', type: 'Memorial descritivo' },
+  ];
+  const authorities = ['CPRH', 'IBAMA', 'ANTAQ', 'APAC', 'ANVISA', 'SEMAS', 'SUAPE'];
+  const statuses = ['IMPORTED', 'EXTRACTED', 'LINKED', 'VALIDATION_PENDING', 'CLASSIFICATION_PENDING', 'FAILED'];
+  const subjects = [
+    'efluentes',
+    'ruido_ambiental',
+    'emissoes_atmosfericas',
+    'dragagem',
+    'vegetacao',
+    'residuos',
+    'outorga_captacao',
+    'auditoria',
+    'plano_emergencia',
+    'area_influencia',
+  ];
+
+  return Array.from({ length: count }, (_, index) => {
+    const file = extensions[index % extensions.length];
+    const authority = authorities[index % authorities.length];
+    const status = statuses[index % statuses.length];
+    const subject = subjects[index % subjects.length];
+    const folder = mockFolders[(index + 7) % mockFolders.length];
+    const sequence = String(index + 1).padStart(3, '0');
+    const licenseNumber = `${authority}-MOCK-2026-${sequence}`;
+    const extractionStatus = status === 'FAILED'
+      ? 'FAILED'
+      : file.extension === 'kmz' || status === 'CLASSIFICATION_PENDING'
+        ? 'PENDING'
+        : 'SUCCESS';
+    const extractionQuality = extractionStatus === 'FAILED'
+      ? null
+      : index % 3 === 0
+        ? 'HIGH'
+        : index % 3 === 1
+          ? 'MEDIUM'
+          : 'LOW';
+
+    return mockDocument({
+      id: `doc-auto-${sequence}`,
+      fileName: `${authority}_${subject}_${sequence}.${file.extension}`,
+      folder,
+      documentType: file.type,
+      issuingAuthority: authority,
+      licenseNumber,
+      validUntil: index % 4 === 0 ? `2026-${String(8 + (index % 5)).padStart(2, '0')}-${String(10 + (index % 18)).padStart(2, '0')}` : null,
+      importStatus: status,
+      extractionStatus,
+      extractionQuality,
+      fileExtension: file.extension,
+      mimeType: file.mimeType,
+      errorMessage: status === 'FAILED' ? 'Arquivo mockado com falha simulada de extração.' : null,
+      modifiedAtSource: `2026-06-${String(18 - (index % 10)).padStart(2, '0')}T${String(8 + (index % 10)).padStart(2, '0')}:${String((index * 7) % 60).padStart(2, '0')}:00.000Z`,
+    });
+  });
 }
 
 function mockDocument(input: {
