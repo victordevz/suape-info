@@ -844,13 +844,13 @@ select:focus {
   align-items: center;
   gap: 0.75rem;
   min-width: 0;
-  color: var(--suape-blue-900);
+  color: #ffffff;
   text-decoration: none;
 }
 
 .sidebar-brand {
   padding-bottom: 1.5rem;
-  border-bottom: 1px solid #e8eef6;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
 }
 
 .dashboard-brand-symbol {
@@ -880,7 +880,7 @@ select:focus {
 
 .dashboard-brand small {
   margin-top: 0.2rem;
-  color: #63708a;
+  color: rgba(255, 255, 255, 0.68);
   font-size: 0.78rem;
   line-height: 1.2;
 }
@@ -891,8 +891,8 @@ select:focus {
   flex-direction: column;
   gap: 2.5rem;
   padding: 2rem 1.5rem 1.5rem;
-  border-right: 1px solid #d9e2ee;
-  background: #ffffff;
+  border-right: 1px solid rgba(20, 53, 99, 0.22);
+  background: #3266b1;
 }
 
 .dashboard-nav-section {
@@ -901,7 +901,7 @@ select:focus {
 }
 
 .dashboard-nav-title {
-  color: #8ca0bd;
+  color: rgba(255, 255, 255, 0.52);
   font-size: 0.72rem;
   font-weight: 900;
   text-transform: uppercase;
@@ -917,7 +917,7 @@ select:focus {
   align-items: center;
   min-height: 2.75rem;
   padding: 0 1.25rem;
-  color: #42526b;
+  color: rgba(255, 255, 255, 0.72);
   text-decoration: none;
   border-left: 0.25rem solid transparent;
   border-radius: 0.5rem;
@@ -926,13 +926,13 @@ select:focus {
 }
 
 .dashboard-nav-item.active {
-  color: var(--suape-blue-900);
-  border-left-color: var(--suape-blue);
-  background: #eaf1fb;
+  color: #ffffff;
+  border-left-color: var(--suape-yellow);
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .dashboard-nav-item.muted {
-  color: #42526b;
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .dashboard-main {
@@ -2353,7 +2353,7 @@ select:focus {
     gap: 1.25rem;
     padding: 1rem;
     border-right: 0;
-    border-bottom: 1px solid #d9e2ee;
+    border-bottom: 1px solid rgba(20, 53, 99, 0.22);
   }
 
   .dashboard-main {
@@ -2374,7 +2374,7 @@ select:focus {
   }
 
   .dashboard-nav-item.active {
-    border-bottom-color: var(--suape-blue);
+    border-bottom-color: var(--suape-yellow);
   }
 
   .sidebar-brand {
