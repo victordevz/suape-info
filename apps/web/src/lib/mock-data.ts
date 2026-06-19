@@ -479,6 +479,58 @@ mockDocuments.push(
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     modifiedAtSource: '2026-06-12T09:12:00.000Z',
   }),
+  mockDocument({
+    id: 'doc-kml-area-influencia',
+    fileName: 'Area_influencia_direta_terminal_gml.kml',
+    folder: mockFolders[5],
+    documentType: 'Arquivo geoespacial',
+    issuingAuthority: 'SUAPE',
+    licenseNumber: 'CPRH-LO-2026-118',
+    importStatus: 'EXTRACTED',
+    extractionQuality: 'HIGH',
+    fileExtension: 'kml',
+    mimeType: 'application/vnd.google-earth.kml+xml',
+    modifiedAtSource: '2026-06-11T14:24:00.000Z',
+  }),
+  mockDocument({
+    id: 'doc-kml-poligonal-app',
+    fileName: 'Poligonal_APP_manguezal_monitorado.kml',
+    folder: mockFolders[5],
+    documentType: 'Arquivo geoespacial',
+    issuingAuthority: 'CPRH',
+    licenseNumber: '05.21.09.003636-1',
+    importStatus: 'LINKED',
+    extractionQuality: 'HIGH',
+    fileExtension: 'kml',
+    mimeType: 'application/vnd.google-earth.kml+xml',
+    modifiedAtSource: '2026-06-11T10:18:00.000Z',
+  }),
+  mockDocument({
+    id: 'doc-kmz-zona-dragagem',
+    fileName: 'Zona_dragagem_bacia_evolucao_2026.kmz',
+    folder: mockFolders[5],
+    documentType: 'Pacote geoespacial',
+    issuingAuthority: 'ANTAQ',
+    licenseNumber: 'ANTAQ-DRG-2026-089',
+    importStatus: 'IMPORTED',
+    extractionStatus: 'PENDING',
+    fileExtension: 'kmz',
+    mimeType: 'application/vnd.google-earth.kmz',
+    modifiedAtSource: '2026-06-10T16:05:00.000Z',
+  }),
+  mockDocument({
+    id: 'doc-kmz-outorga-apac',
+    fileName: 'Pontos_captacao_outorga_APAC_2026.kmz',
+    folder: mockFolders[6],
+    documentType: 'Pacote geoespacial',
+    issuingAuthority: 'APAC',
+    licenseNumber: 'APAC-CAP-2026-077',
+    importStatus: 'VALIDATION_PENDING',
+    extractionStatus: 'PENDING',
+    fileExtension: 'kmz',
+    mimeType: 'application/vnd.google-earth.kmz',
+    modifiedAtSource: '2026-06-10T11:46:00.000Z',
+  }),
 );
 
 const mockJobs: ImportJob[] = [
@@ -1253,6 +1305,14 @@ function applyDocumentFilters(
       filters.fileType === 'SPREADSHEET' &&
       !['xlsx', 'xls', 'csv', 'ods'].includes(document.fileExtension ?? '')
     ) {
+      return false;
+    }
+
+    if (filters.fileType === 'KML' && document.fileExtension !== 'kml') {
+      return false;
+    }
+
+    if (filters.fileType === 'KMZ' && document.fileExtension !== 'kmz') {
       return false;
     }
 

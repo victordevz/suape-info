@@ -18,6 +18,8 @@ const documentTypeTags: Array<{
   { label: 'Condicionantes' },
   { label: 'PDFs', fileType: 'PDF' },
   { label: 'Planilhas', fileType: 'SPREADSHEET' },
+  { label: 'KML', fileType: 'KML' },
+  { label: 'KMZ', fileType: 'KMZ' },
 ];
 
 const statusOptions = [
@@ -329,6 +331,8 @@ function getDashboardFilters(
     fileType: getAllowedParam(searchParams?.fileType, [
       'PDF',
       'SPREADSHEET',
+      'KML',
+      'KMZ',
     ]) as DashboardFilters['fileType'],
   };
 }

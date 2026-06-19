@@ -97,7 +97,7 @@ export type DashboardFilters = {
   q?: string;
   monitoredFolderId?: string;
   importStatus?: string;
-  fileType?: 'PDF' | 'SPREADSHEET';
+  fileType?: 'PDF' | 'SPREADSHEET' | 'KML' | 'KMZ';
 };
 
 export type DocumentMetrics = {
