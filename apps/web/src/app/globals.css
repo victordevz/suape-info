@@ -1,3 +1,19 @@
+@font-face {
+  font-family: "Matt Trial";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/matt/Matt_TrialVariable-Roman-BF670897ecee147.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Matt Trial";
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/matt/Matt_TrialVariable-Italic-BF670897ed2df26.ttf") format("truetype");
+}
+
 :root {
   --suape-blue: #2e60ad;
   --suape-blue-900: #143563;
@@ -29,7 +45,7 @@ body {
   min-height: 100%;
   margin: 0;
   color: var(--ink);
-  font-family: Manrope, "Avenir Next", "Segoe UI", sans-serif;
+  font-family: "Matt Trial", Manrope, "Avenir Next", "Segoe UI", sans-serif;
 }
 
 button,
