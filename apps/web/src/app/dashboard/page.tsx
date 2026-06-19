@@ -2,10 +2,9 @@ import Link from 'next/link';
 import { DashboardShell } from '../dashboard-shell';
 import {
   getAuditEvents,
-  getDashboardData,
+  getOverviewDriveDocuments,
   getLicenseTriageSheet,
   type AuditEvent,
-  type DashboardData,
   type LicenseTriageSheetResult,
   type SourceDocument,
 } from '../../lib/api';
@@ -49,15 +48,15 @@ type KpiMetric = {
 };
 
 export default async function DashboardOverviewPage() {
-  const [dashboardData, triageSheet, auditEvents] = await Promise.all([
-    getDashboardData(),
+  const [driveDocuments, triageSheet, auditEvents] = await Promise.all([
+    getOverviewDriveDocuments(),
     loadLicenseTriageSheet(),
     loadAuditEvents(),
   ]);
 
   const licenses = normalizeOverviewLicenses(triageSheet);
   const licensesByExpiration = sortLicensesByExpiration(licenses);
-  const openBills = getOpenBills(dashboardData.documents);
+  const openBills = getOpenBills(driveDocuments);
   const processQueue = getProcessesToOpen(licensesByExpiration);
   const metrics = getOverviewMetrics({
     auditEvents,
@@ -463,7 +462,7 @@ function sortLicensesByExpiration(licenses: OverviewLicense[]) {
   });
 }
 
-function getOpenBills(documents: DashboardData['documents']): OpenBill[] {
+function getOpenBills(documents: SourceDocument[]): OpenBill[] {
   return documents
     .filter((document) => hasBillSignal(document))
     .map((document) => ({

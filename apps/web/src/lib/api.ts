@@ -297,17 +297,26 @@ export type LicenseTriageSheetResult = {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api';
 const MOCK_MODE = isMockModeEnabled();
+const DRIVE_READ_REVALIDATE_SECONDS = 30;
 
 function getBrowserSafeApiUrl() {
   return typeof window === 'undefined' ? API_URL : '/backend';
 }
 
-async function fetchJson<T>(path: string): Promise<T> {
+async function fetchJson<T>(
+  path: string,
+  options?: {
+    revalidate?: number;
+  },
+): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
-    cache: 'no-store',
+    cache: options?.revalidate ? 'force-cache' : 'no-store',
     headers: {
       accept: 'application/json',
     },
+    next: options?.revalidate
+      ? { revalidate: options.revalidate }
+      : undefined,
   });
 
   if (!response.ok) {
@@ -334,11 +343,20 @@ export async function getDashboardData(
     const [status, folders, documents, metrics, jobs] = await Promise.all([
       fetchJson<{ configured: boolean; sources: ConnectedSource[] }>(
         '/integrations/google-drive/status',
+        { revalidate: DRIVE_READ_REVALIDATE_SECONDS },
       ),
-      fetchJson<MonitoredFolder[]>('/monitored-folders'),
-      fetchJson<SourceDocument[]>(`/documents${documentQuery}`),
-      fetchJson<DocumentMetrics>(`/documents/stats${statsQuery}`),
-      fetchJson<ImportJob[]>('/sync/jobs?take=5'),
+      fetchJson<MonitoredFolder[]>('/monitored-folders', {
+        revalidate: DRIVE_READ_REVALIDATE_SECONDS,
+      }),
+      fetchJson<SourceDocument[]>(`/documents${documentQuery}`, {
+        revalidate: DRIVE_READ_REVALIDATE_SECONDS,
+      }),
+      fetchJson<DocumentMetrics>(`/documents/stats${statsQuery}`, {
+        revalidate: DRIVE_READ_REVALIDATE_SECONDS,
+      }),
+      fetchJson<ImportJob[]>('/sync/jobs?take=5', {
+        revalidate: DRIVE_READ_REVALIDATE_SECONDS,
+      }),
     ]);
 
     return {
@@ -369,6 +387,16 @@ export async function getDashboardData(
       },
       jobs: [],
     };
+  }
+}
+
+export async function getOverviewDriveDocuments(take = 40) {
+  try {
+    return await fetchJson<SourceDocument[]>(`/documents?take=${take}`, {
+      revalidate: DRIVE_READ_REVALIDATE_SECONDS,
+    });
+  } catch {
+    return [];
   }
 }
 
