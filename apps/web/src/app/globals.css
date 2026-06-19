@@ -1532,11 +1532,9 @@ select:focus {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 2.1rem;
-  height: 2.1rem;
+  width: 1.35rem;
+  height: 1.35rem;
   color: var(--suape-blue);
-  border-radius: 0.5rem;
-  background: #ebf0f8;
   line-height: 1;
 }
 
@@ -1592,22 +1590,18 @@ select:focus {
 
 .overview-kpi-card.green .overview-kpi-icon {
   color: #2e7d32;
-  background: #e8f5ea;
 }
 
 .overview-kpi-card.yellow .overview-kpi-icon {
   color: #f59e0b;
-  background: #fef3c7;
 }
 
 .overview-kpi-card.red .overview-kpi-icon {
   color: #c62828;
-  background: #fee2e2;
 }
 
 .overview-kpi-card.cyan .overview-kpi-icon {
   color: #0e7490;
-  background: #e6f7fb;
 }
 
 .overview-kpi-badge.green,
