@@ -509,13 +509,13 @@ function getOverviewMetrics(input: {
 function KpiIcon({ name }: { name: KpiMetric['icon'] }) {
   const commonProps = {
     fill: 'none',
-    height: 18,
+    height: 20,
     stroke: 'currentColor',
     strokeLinecap: 'round' as const,
     strokeLinejoin: 'round' as const,
-    strokeWidth: 2.1,
+    strokeWidth: 2,
     viewBox: '0 0 24 24',
-    width: 18,
+    width: 20,
   };
 
   if (name === 'calendar') {
@@ -523,8 +523,8 @@ function KpiIcon({ name }: { name: KpiMetric['icon'] }) {
       <svg {...commonProps}>
         <path d="M8 2v4" />
         <path d="M16 2v4" />
-        <path d="M3.5 9h17" />
-        <rect height="17" rx="2.5" width="17" x="3.5" y="4" />
+        <path d="M3 9h18" />
+        <rect height="18" rx="2.5" width="18" x="3" y="4" />
       </svg>
     );
   }
@@ -532,7 +532,7 @@ function KpiIcon({ name }: { name: KpiMetric['icon'] }) {
   if (name === 'receipt') {
     return (
       <svg {...commonProps}>
-        <path d="M6 2.8h12v18.4l-2-1.2-2 1.2-2-1.2-2 1.2-2-1.2-2 1.2z" />
+        <path d="M6 3h12v18l-2-1.2-2 1.2-2-1.2-2 1.2-2-1.2-2 1.2z" />
         <path d="M9 8h6" />
         <path d="M9 12h6" />
         <path d="M9 16h4" />
@@ -543,8 +543,8 @@ function KpiIcon({ name }: { name: KpiMetric['icon'] }) {
   if (name === 'file-search') {
     return (
       <svg {...commonProps}>
-        <path d="M14 2.8H7a2 2 0 0 0-2 2v14.4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
-        <path d="M14 2.8V8h5" />
+        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+        <path d="M14 3v5h5" />
         <circle cx="11" cy="13" r="2.3" />
         <path d="m12.8 14.8 2.2 2.2" />
       </svg>
